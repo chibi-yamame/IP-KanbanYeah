@@ -20,16 +20,16 @@
 
 ## CLI（`Program.Cli`）
 ```
-KanbanDrawer.exe 画像                 … 画面で開く
-KanbanDrawer.exe --draw 画像 [--fit contain|cover|stretch] [--dither none|fs|atkinson|bayer] [--strength 0-100]
+KanbanYeah.exe 画像                 … 画面で開く
+KanbanYeah.exe --draw 画像 [--fit contain|cover|stretch] [--dither none|fs|atkinson|bayer] [--strength 0-100]
                  [--bg RRGGBB] [--input post|send] [--delay ms] [--click-delay ms] [--fence n] [--retouch n]
                  [--countdown s] [--save-quantized out.png] [--log file] [--debug-shot out.png]
-KanbanDrawer.exe --quantize 画像 --save-quantized out.png [オプション]
-KanbanDrawer.exe --detect
-KanbanDrawer.exe --compare a.png b.png
-KanbanDrawer.exe --register-stamp 画像 [--remove-bg]          … 320x240 を超えると終了コード 1
-KanbanDrawer.exe [--fit ...] [--dither ...] --register-frame 画像
-KanbanDrawer.exe --dotfont-dump dir 10-22 chars.txt                         … 公式文字の調査用（GDI の字形を書き出す）
+KanbanYeah.exe --quantize 画像 --save-quantized out.png [オプション]
+KanbanYeah.exe --detect
+KanbanYeah.exe --compare a.png b.png
+KanbanYeah.exe --register-stamp 画像 [--remove-bg]          … 320x240 を超えると終了コード 1
+KanbanYeah.exe [--fit ...] [--dither ...] --register-frame 画像
+KanbanYeah.exe --dotfont-dump dir 10-22 chars.txt                         … 公式文字の調査用（GDI の字形を書き出す）
 ```
 終了コード: 0 = 完成（`--compare` は一致）、1 = 一致しない画素が残った（不一致）、2 = 中断、3 = エラー / 見つからない。
 親コンソールがあれば出力（UTF-8）、`--log` でファイルにも。CLI の `--draw` は画像 1 枚だけ（スタンプ・文字は画面から）。

@@ -1,0 +1,46 @@
+name: Release
+
+# Push a tag like v0.3.0 -> tests, builds KanbanYeah.exe with that version and publishes a GitHub Release with the zip.
+# Run by hand (Actions -> Release -> Run workflow) to only build the zip as a workflow artifact, without a release.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Version
+        id: ver
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF_TYPE -eq 'tag') { $v = $env:GITHUB_REF_NAME.TrimStart('v') }
+          else { $v = ([xml](Get-Content src/KanbanDrawer/KanbanDrawer.csproj)).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1 }
+          "version=$v" >> $env:GITHUB_OUTPUT
+      - name: Unit tests
+        run: dotnet test tests/KanbanDrawer.Tests -c Release
+      - name: Build
+        run: dotnet build src/KanbanDrawer -c Release -p:Version=${{ steps.ver.outputs.version }}
+      - name: Package
+        shell: pwsh
+        run: |
+          $name = "KanbanYeah-${{ steps.ver.outputs.version }}"
+          New-Item -ItemType Directory -Force "out/$name" | Out-Null
+          Copy-Item src/KanbanDrawer/bin/Release/net48/KanbanYeah.exe, README.md, LICENSE "out/$name/"
+          Compress-Archive -Path "out/$name/*" -DestinationPath "out/$name.zip"
+          (Get-FileHash "out/$name.zip" -Algorithm SHA256).Hash.ToLower() + "  $name.zip" | Out-File -Encoding ascii "out/$name.zip.sha256"
+          "NAME=$name" >> $env:GITHUB_ENV
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.NAME }}
+          path: out/${{ env.NAME }}/
+      - name: GitHub Release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${{ github.ref_name }}" "out/${{ env.NAME }}.zip" "out/${{ env.NAME }}.zip.sha256" --title "看板屋 ${{ github.ref_name }}" --generate-notes

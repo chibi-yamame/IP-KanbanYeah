@@ -1,0 +1,17 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: dotnet build src/KanbanDrawer -c Release
+      - name: Unit tests
+        run: dotnet test tests/KanbanDrawer.Tests -c Release --logger "console;verbosity=normal"

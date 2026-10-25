@@ -38,7 +38,7 @@
 色は完全一致（許容差 0）。100 % 表示の Java 8（DPI aware）は 1:1 で描くので問題ない。
 
 ## 不変条件とテスト
-- スクショで (38,112) が 1 つだけ、黒選択・4px ペン選択と判定: `BoardLocatorTests.FindsTheEditorInTheUsersScreenshot`
+- スクショで (38,112) が 1 つだけ、黒選択・4px ペン選択と判定: `BoardLocatorScreenshotTests.FindsTheEditorInTheUsersScreenshot`（開発環境のテスト）
 - ボタンが隠れたら見つからない: `NothingFoundWhenAButtonIsCovered`。模擬画面でも検出: `FindsTheFakeEditor`
 
 ## 落とし穴

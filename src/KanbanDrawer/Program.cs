@@ -28,13 +28,13 @@ namespace KanbanDrawer
     /// <summary>
     /// Command line mode (used by tools/e2e.sh). Exit codes: 0 drawn and verified, 1 drawn with wrong pixels left,
     /// 2 interrupted, 3 error (bad arguments, no editor found).
-    ///   KanbanDrawer.exe --draw pic.png [--fit contain|cover|stretch] [--dither none|fs|atkinson|bayer] [--strength 0-100]
+    ///   KanbanYeah.exe --draw pic.png [--fit contain|cover|stretch] [--dither none|fs|atkinson|bayer] [--strength 0-100]
     ///                    [--bg RRGGBB] [--delay ms] [--click-delay ms] [--fence n] [--retouch n] [--countdown s] [--input post|send]
     ///                    [--save-quantized out.png] [--log file]
-    ///   KanbanDrawer.exe --detect [--log file]
-    ///   KanbanDrawer.exe --quantize pic.png --save-quantized out.png [options]
-    ///   KanbanDrawer.exe --register-stamp pic.png [--remove-bg]                  (adds to the stamp library)
-    ///   KanbanDrawer.exe [--fit ...] [--dither ...] --register-frame pic.png     (adds to the frame library)
+    ///   KanbanYeah.exe --detect [--log file]
+    ///   KanbanYeah.exe --quantize pic.png --save-quantized out.png [options]
+    ///   KanbanYeah.exe --register-stamp pic.png [--remove-bg]                  (adds to the stamp library)
+    ///   KanbanYeah.exe [--fit ...] [--dither ...] --register-frame pic.png     (adds to the frame library)
     /// Settings and libraries live in %APPDATA%\KanbanDrawer, or in the folder named by KANBANDRAWER_DATA.
     /// </summary>
     internal static class Cli

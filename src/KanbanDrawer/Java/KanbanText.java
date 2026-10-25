@@ -7,7 +7,7 @@ import java.io.*;
  * shortcut uses), one long-lived process, so the result is pixel-identical to the program's 文字 tool (TextTool.drawText: Font("SansSerif", PLAIN, 12) by default, drawString on the board's
  * BufferedImage, no anti-aliasing, lines split at '\n' and spaced by FontMetrics.getHeight()).
  *
- * Built by tools/textjar.sh into src/KanbanDrawer/Resources/kanban-text.jar (embedded in KanbanDrawer.exe).
+ * Built by tools/textjar.sh into src/KanbanDrawer/Resources/kanban-text.jar (embedded in KanbanYeah.exe).
  * Protocol (stdin / stdout, one request per line, until stdin closes, then the process exits):
  *   request : "<size> <bold 0|1> <text as base64 UTF-8>"
  *   answer  : "<width> <height> <base64 of width*height bytes, 1 = ink>"   (box: widest line x lines*height)

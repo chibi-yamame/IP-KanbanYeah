@@ -1,13 +1,19 @@
 # 看板屋（InterPot 看板お絵かきツール）
 
+[![CI](https://github.com/chibi-yamame/IP-KanbanYeah/actions/workflows/ci.yml/badge.svg)](https://github.com/chibi-yamame/IP-KanbanYeah/actions/workflows/ci.yml)
+
 Windows 版 InterPot3 の看板エディタに、好きな絵を自動で描くツールです。
 
-- `KanbanDrawer.exe` 1 つで動きます（Windows 10 / 11、追加インストール不要、管理者権限不要）。
+- `KanbanYeah.exe` 1 つで動きます（Windows 10 / 11、追加インストール不要、管理者権限不要）。
 - 画像・スタンプ・文字・フレームを組み合わせて看板を作り、看板の 10 色・1px ペンで描きます。描いたあとの「保存」はご自身で押してください。
 - 描画中もマウスは自由に使えます（既定の「バックグラウンド」方式）。
 
+## 入手
+[Releases](https://github.com/chibi-yamame/IP-KanbanYeah/releases) から `KanbanYeah-<版>.zip` をダウンロードして展開します。
+署名のない exe なので、初回に Windows の「PC を保護しました」が出たら「詳細情報」→「実行」で起動できます。
+
 ## 使い方
-1. `KanbanDrawer.exe` を起動し、右のタブで看板を作ります（左はフルカラーで表示）。**「下書き」**を押すと、実際に描く 10 色の絵と
+1. `KanbanYeah.exe` を起動し、右のタブで看板を作ります（左はフルカラーで表示）。**「下書き」**を押すと、実際に描く 10 色の絵と
    本数・目安時間が出ます（「カラー / 下書き」で表示を切り替え）。
    - **画像**: 看板全体に 1 枚の画像（ボタン、またはウィンドウへのドラッグ&ドロップ）
    - **下地**: 無地の色、または登録したフレーム（登録時に看板サイズ・10 色にして保存されます）
@@ -32,7 +38,7 @@ Windows 版 InterPot3 の看板エディタに、好きな絵を自動で描く�
 ## ビルド
 - 必要なもの: .NET SDK（6 以降）。ターゲットは .NET Framework 4.8（参照アセンブリは NuGet から取得）。
   ```
-  dotnet build src/KanbanDrawer -c Release      # → src/KanbanDrawer/bin/Release/net48/KanbanDrawer.exe（単一ファイル）
+  dotnet build src/KanbanDrawer -c Release      # → src/KanbanDrawer/bin/Release/net48/KanbanYeah.exe（単一ファイル）
   ```
 - 「公式と同じ」文字の描画プログラム（`src/KanbanDrawer/Java/KanbanText.java`）を変えたときだけ、JDK で jar を作り直します
   （Java 8 で動くように `--release 8`）:
@@ -40,6 +46,11 @@ Windows 版 InterPot3 の看板エディタに、好きな絵を自動で描く�
   javac --release 8 -encoding UTF-8 -d out src/KanbanDrawer/Java/*.java
   jar cf src/KanbanDrawer/Resources/kanban-text.jar -C out .
   ```
+- 単体テスト: `dotnet test tests/KanbanDrawer.Tests`。「公式と同じ」文字を Java の描画と突き合わせるテストは、
+  .jar を開く Java がない環境（CI など）では何もせずに通ります。
+- CI（GitHub Actions）: `main` への push と pull request でビルドと単体テスト（`.github/workflows/ci.yml`）。
+- リリース: `v0.3.0` のようなタグを push すると、その版数でビルドして Releases に zip（exe・README・LICENSE）と SHA-256 を載せます
+  （`.github/workflows/release.yml`。Actions の画面から手動実行すると、リリースは作らずに zip だけ作ります）。
 
 ## ドキュメント
 - [docs/SPEC.md](docs/SPEC.md) — 仕様
