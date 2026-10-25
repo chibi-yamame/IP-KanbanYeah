@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <RootNamespace>KanbanDrawer</RootNamespace>
+    <AssemblyName>KanbanDrawer</AssemblyName>
+    <Version>0.2.0</Version>
+    <Product>看板屋</Product>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- 公式と同じ text: the program's renderer, run with the Java that opens .jar files (Java/KanbanText.java, tools/textjar.sh) -->
+  <ItemGroup>
+    <EmbeddedResource Include="Resources/kanban-text.jar" LogicalName="KanbanDrawer.kanban-text.jar" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="KanbanDrawer.Tests" />
+  </ItemGroup>
+
+</Project>
