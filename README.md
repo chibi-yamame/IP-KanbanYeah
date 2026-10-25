@@ -45,4 +45,7 @@ Windows 版 InterPot3 の看板エディタに、好きな絵を自動で描く�
 - [docs/SPEC.md](docs/SPEC.md) — 仕様
 - [docs/design/](docs/design/README.md) — 設計（領域ごと）
 
+## ライセンス
+[MIT License](LICENSE)（Copyright (c) 2026 chibi-yamame）。無保証です。
+
 非公式のファンメイドツールです。InterPot の運営とは関係ありません。
