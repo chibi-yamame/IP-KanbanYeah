@@ -53,6 +53,7 @@ namespace KanbanDrawer.UI
         public MainForm(string picture = null)
         {
             Text = AppTitle;
+            using (var icon = typeof(MainForm).Assembly.GetManifestResourceStream("KanbanDrawer.app.ico")) Icon = new Icon(icon);
             Font = new Font("Yu Gothic UI", 9f);
             AutoScaleMode = AutoScaleMode.Dpi;
             ClientSize = new Size(744, 600);
