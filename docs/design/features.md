@@ -48,6 +48,7 @@
 |---|---|
 | `GdiTextRasterizer` | `GraphicsPath.AddString` → 変換 → `SmoothingMode.None` で塗り（縁取りは `Widen`）→ 2 値マスク。フォントはインストール済み一覧（既定: Yu Gothic UI → メイリオ → …） |
 | `ImageLibrary` / `StampLibrary` / `FrameLibrary` | `AppPaths.DataDir\stamps|frames\<id>.png` + `index.txt`（1 行 1 id、壊れた行・無いファイル・パス文字を含む行は無視、.tmp 経由で保存）。どれも ARGB で読み書きする（`Load`。フレームも同じ。前の版の 10 色フレームもそのまま読める）。削除: `Delete(ids)` は削除の記録を返し、ファイルを `trash\` に移す（最後の 1 回分だけ保持、`index.txt` の対象外。画面の起動時に `EmptyTrash`、CLI では空にしない＝画面を開いたまま CLI で登録しても「元に戻す」が消えない）。`Restore(記録)` で元の順番に戻す（削除後に一覧が変わっていれば、残っている直前の項目の後ろ） |
+| `ClipboardContent` | `Read(IDataObject)`: ファイル > PNG（アルファ）> Bitmap > テキストの優先順位で 1 種類を返す（下の「クリップボードから貼り付け」） |
 | `AppPaths` | `%APPDATA%\KanbanDrawer`、または環境変数 `KANBANDRAWER_DATA`（テスト・持ち運び用） |
 
 ### UI（`UI/Features/`, `UI/Widgets/`, `UI/EditorView.cs`）
@@ -61,6 +62,11 @@ interface IFeature
     void Load(Settings s); void Save(Settings s);
 }
 interface IAcceptsFiles { bool OpenFile(string path); } // ドロップされた画像（表示中のタブ優先、なければ最初の 1 つ）
+interface IAcceptsPaste                                  // 貼り付け（クリップボード）。受け取れない種類は false を返す
+{
+    bool PasteImage(Raster image, string name);          // 画像データ（アルファつき ARGB）と名前
+    bool PasteText(string text);                         // 前後の空白・空行を除いた、空でないテキスト
+}
 ```
 - 登録は `FeatureRegistry.Create()` の 1 か所（タブ順 = 重ね順の下から。起動時は先頭の下地を開く）: `FrameFeature`（下地）, `PictureFeature`（画像）, `StampFeature`（スタンプ）,
   `TextFeature`（文字）, `QuantizeFeature`（減色）。**機能を外す = この行と Feature のファイル（とその `BoardObject` 種類）を消す**。
@@ -79,11 +85,48 @@ interface IAcceptsFiles { bool OpenFile(string path); } // ドロップされた
 ## 各 Feature
 | タブ | できること |
 |---|---|
-| 画像 | 開く（ボタン / ドロップ / exe への引数）→ `PictureObject` を最背面に置いて選択、置き方（全体を収める〔既定〕/ トリミングして埋める / 等倍）。選択中: 大きさ 1〜400%（100% = 読み込んだ画素の等倍）・回転 ±180°・看板に合わせる（今の置き方で置き直す）・前面へ・背面へ・看板から削除。画像を選ぶとこのタブに切り替わる（`Owns`） |
+| 画像 | 開く（ボタン / ドロップ / 貼り付け / exe への引数。貼り付けは `IAcceptsPaste.PasteImage`、名前「クリップボード」）→ `PictureObject` を最背面に置いて選択、置き方（全体を収める〔既定〕/ トリミングして埋める / 等倍）。選択中: 大きさ 1〜400%（100% = 読み込んだ画素の等倍）・回転 ±180°・看板に合わせる（今の置き方で置き直す）・前面へ・背面へ・看板から削除。画像を選ぶとこのタブに切り替わる（`Owns`） |
 | 下地 | 背景色（10 色、常に有効）とフレーム一覧（「なし」+ 登録済み）を別々に選ぶ。登録（ファイル →「背景を消す」〔既定オフ、設定キー `frame.removeBg`、`StampPrep.RemoveBackground` でスタンプと同じ処理、切り詰めなし〕→ 合わせ方（既定: トリミングして埋める）で 320x240 に配置（アルファはそのまま）→ フルカラーのまま保存。減色は下書きで。「全体を収める」の余白は透明）。削除は複数選択・Delete・右クリック・「選んだものを削除」・「削除を元に戻す」（スタンプと共通） |
 | スタンプ | 一覧（クリックで中央に等倍で置く。複数選択・削除・「削除を元に戻す」は下地と共通、元画像の 1 画素 = 看板の 1 画素 = 100%）、登録（複数選択可、背景を消す〔既定オフ〕、切り詰め後 320×240 を超えるものは登録せず一覧で知らせる）、選択中: 大きさ 5〜400%・回転 ±180°・前面へ・背面へ・看板から削除 |
-| 文字 | 文字の形: **公式と同じ（ドット文字）** / フォントを選ぶ。文字（複数行可）・サイズ（公式 10〜22px / 自由 6〜200px、モードごとに記憶）・太字（自由のみ）・色・縁取り（なし / 10 色）・縁の幅 1〜5・回転（自由のみ）・文字を追加。選択中の文字には即反映 |
+| 文字 | 文字の形: **公式と同じ（ドット文字）** / フォントを選ぶ。文字（複数行可）・サイズ（公式 10〜22px / 自由 6〜200px、モードごとに記憶）・太字（自由のみ）・色・縁取り（なし / 10 色）・縁の幅 1〜5・回転（自由のみ）・文字を追加。選択中の文字には即反映。貼り付け（`IAcceptsPaste.PasteText`）= 貼ったテキストを今の設定で追加 |
 | 減色 | ディザ・強さ・明るさ・コントラスト・彩度（▼ で戻す）・使う色 |
+
+## クリップボードから貼り付け
+Ctrl+V・「貼り付け」ボタン（[ui.md](ui.md)）で、クリップボードの画像・テキストを看板に置く。読み取りは `MainForm`、置くのは各 Feature。
+
+- **読み取り**（`Win/ClipboardContent`）: `ClipboardContent.Read(IDataObject)` が、上から順に最初に見つかった 1 種類だけを返す
+  （`Kind` = `None` / `Files` / `Image` / `Text`）。`Clipboard.GetDataObject()` は `MainForm` が呼び、`Read` は `DataObject` を渡せば
+  動く（単体テストできる。`Clipboard` 自体は触らない）。
+  1. `FileDrop`（エクスプローラーでコピーしたファイル）: 拡張子が画像（png / jpg / jpeg / bmp / gif、「画像」タブの開くダイアログと同じ）で
+     実在するものを順に `Files` へ。1 つもなければこの段階は無かったものとして次へ。
+  2. `PNG` 形式（`MemoryStream`。アルファを保つ。ブラウザ・Office・画像編集ソフトが入れる）→ なければ `Bitmap`（`DataFormats.Bitmap`、
+    DIB を含む。不透明）。どちらも `ImageLoader.ToRaster` で `Raster`（ARGB）にして `Image` へ。    読めない・壊れている形式は無かったものとして次へ。
+  3. `UnicodeText`（`DataFormats.UnicodeText`）: 前後の空白・空行（`Trim()`、改行を含む）を除いて、空でなければ `Text` へ。途中の
+     改行・空行はそのまま（複数行の文字になる）。長さは切らない。
+  - 画像とテキストが両方あるとき（ブラウザ・Office のコピー）は画像を優先する。どれも無ければ `None`。
+  - 例外（クリップボードが他のアプリに掴まれている等）は `None` 扱い（落とさない）。
+- **受け取り**: 画像・文字の Feature が `IAcceptsPaste` を実装する（`IAcceptsFiles` と同じく `IFeature` とは別の任意のインターフェース。
+  Feature 同士は参照せず、`MainForm` が仲立ち）。受け取れない種類（`PictureFeature.PasteText`、`TextFeature.PasteImage`）は何もせず
+  `false`。`MainForm.Paste()` は読んだ種類で選ぶ:
+  - `Files`: 各ファイルをドロップと同じ（`IAcceptsFiles.OpenFile`。表示中のタブが受け取れればそこ、なければ「画像」タブ）。ファイルごとに
+    1 回の undo（開けなかったファイルは `OpenFile` の通りエラー表示して次へ）。
+  - `Image` / `Text`: 全 Feature から `IAcceptsPaste` を持つものを、表示中のタブ → 登録順の順に試し、最初に `true` を返したものに任せる
+    （実際には画像 = 「画像」タブ、テキスト = 「文字」タブ）。タブは自動では先に切り替えない: 置いたオブジェクトが選択されて
+    `Owns` の仕組み（`OnSelectionChanged`）でそのタブに切り替わる。
+  - `None`: 何もせず、ログ「貼り付けられるものがありません」。
+- **画像**（`PictureFeature.PasteImage`）: 「画像」タブで開いたときと同じ処理（`OpenFile` の読み込み以降を共通のメソッドにして使う）:
+  長辺 1280px に縮小（`PictureObject.Shrink`）、今の「置き方」で配置、`Doc.Insert(0, …)` で最背面に入れて選択。名前（`PictureObject.Name`）は
+  「クリップボード」。ログは「画像: クリップボード (幅×高さ)」（縮小したときは `OpenFile` と同じ書式）。アルファは保たれる（透明部分は下が見える）。
+  読み込み元フォルダ（`picture.folder`）は変えない。
+- **文字**（`TextFeature.PasteText`）: 「文字を追加」と同じ — 今の 文字の形（公式 / フォント）・フォント・サイズ・太字・色・縁取り・縁の幅・
+  回転の設定で `TextObject` を作り（`Text` だけ貼ったテキスト）、`Measure` して `host.AddObject`（看板の中央・選択）。文字欄（`text`）も貼った
+  テキストに入れ替える。このとき欄の変更で今選択中の文字が書き換わらないよう、`Show` と同じ `showing` の守りの中で欄を書き換えてから
+  追加する（追加で新しい文字が選択され、`OnSelection` → `Show` が欄・設定を新しい文字の値にそろえる）。空（空白・空行だけ）なら何もせず
+  `false`（`ClipboardContent` が先にはじくので通常は来ない）。
+- **undo**: 貼り付け 1 回 = 画像・文字ともオブジェクトを 1 つ入れるだけ = undo 1 回（`EndCheckpointBurst` を先に呼んで連続変更と
+  混ざらないようにする。`OpenFile` / `Add` と同じ）。
+- 経緯: 画面右のタブの「開く」「追加」を使わずに、ブラウザ・ペイント・Office・スクリーンショットなどから直接置けるようにした
+  （`Clipboard` の変化は監視しない。ボタンを押したときに読むだけ）。
 
 ## 公式と同じ文字（`TextObject.Official`、`Win/OfficialText`）
 - 公式の文字ツール（`TextTool.drawText`）は Java の論理フォント `SansSerif`（12pt、普通の太さ）で `drawString`。JRE の fontconfig
@@ -121,6 +164,7 @@ interface IAcceptsFiles { bool OpenFile(string path); } // ドロップされた
 - 背景除去と切り詰め、320×240 の判定: `StampPrepTests`。ライブラリ（壊れた行を無視）: `LibraryTests`
 - GDI+ の文字が 2 値・縁取りあり・測った箱の中、再描画速度: `GdiTextTests`
 - 公式文字: Java の描画と全サイズで画素一致、近似でも日本語は一致、回転・拡縮しない・整数座標、縁取り: `OfficialTextTests`
+- 貼り付け（`ClipboardContent.Read` を `DataObject` で）: 形式の優先順位（ファイル > PNG > Bitmap > テキスト、画像とテキストが両方なら画像、画像でないファイルは飛ばして次へ）、PNG のアルファが残る（Bitmap は不透明）、テキストの前後の空白・空行除去（途中の改行は残す）、空・空白だけ・何も無いなら `None`（何も置かない）。画像・文字の追加は `PictureTests` / 既存の処理: `PasteTests`
 - 画面込みの通し: `tools/gui-e2e.sh`（開発環境のテスト）
 
 ## 落とし穴
