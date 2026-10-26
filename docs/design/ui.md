@@ -7,7 +7,7 @@
 - 描画開始から実際の描画までのカウントダウンは 2 秒（`MainForm.CountdownSeconds`、CLI `--countdown` の既定も 2）。
 - 編集はフルカラー表示、「下書き」で 10 色の描く絵を作って表示（[features.md](features.md)「入口・流れ」）。描画開始・PNG 保存は
   下書きが古ければ作り直してから使う。
-- 右: Feature のタブ（`FeatureRegistry`）。各タブの中身は [features.md](features.md)。
+- 右: Feature のタブ（`FeatureRegistry`。下地 → 画像 → スタンプ → 文字 → 減色、起動時は下地）。各タブの中身は [features.md](features.md)。
 - オブジェクトを選ぶと、それを扱う Feature のタブに切り替わる（`IFeature.Owns`）。
 - キー: Ctrl+Z / Ctrl+Y（Ctrl+Shift+Z）= 元に戻す / やり直し（文字入力中を除く）。看板上の操作は `EditorView`。
 - 画像ファイルのドロップ: 表示中のタブが `IAcceptsFiles` ならそこへ、違えば「画像」タブへ。exe への引数 1 個も同じ。
@@ -28,7 +28,7 @@ KanbanYeah.exe --quantize 画像 --save-quantized out.png [オプション]
 KanbanYeah.exe --detect
 KanbanYeah.exe --compare a.png b.png
 KanbanYeah.exe --register-stamp 画像 [--remove-bg]          … 320x240 を超えると終了コード 1
-KanbanYeah.exe [--fit ...] [--dither ...] --register-frame 画像
+KanbanYeah.exe [--fit ...] --register-frame 画像 [--remove-bg]   … 配置して保存するだけ（減色オプションは効かない）
 KanbanYeah.exe --dotfont-dump dir 10-22 chars.txt                         … 公式文字の調査用（GDI の字形を書き出す）
 ```
 終了コード: 0 = 完成（`--compare` は一致）、1 = 一致しない画素が残った（不一致）、2 = 中断、3 = エラー / 見つからない。
