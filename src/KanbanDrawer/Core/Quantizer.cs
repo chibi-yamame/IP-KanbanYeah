@@ -62,6 +62,39 @@ namespace KanbanDrawer.Core
             return Quantize(c, opt);
         }
 
+        /// <summary>Alpha below this is transparent when a frame is registered (<see cref="QuantizeFrame"/>).</summary>
+        public const int FrameAlphaThreshold = 128;
+
+        /// <summary>
+        /// Frame registration: pixels with alpha &lt; <see cref="FrameAlphaThreshold"/> become
+        /// <see cref="IndexedImage.Transparent"/>; the others are quantized by their colour with the alpha ignored
+        /// (not blended with <see cref="QuantizeOptions.Background"/>). Transparent pixels neither give nor take
+        /// dithering error.
+        /// </summary>
+        public static IndexedImage QuantizeFrame(Raster src, QuantizeOptions opt)
+        {
+            var c = new Composite(src.Width, src.Height);
+            var transparent = new bool[src.Pixels.Length];
+            for (int i = 0; i < src.Pixels.Length; i++)
+            {
+                int p = src.Pixels[i];
+                if (((p >> 24) & 255) < FrameAlphaThreshold)
+                {
+                    transparent[i] = true;
+                    c.SetFixed(i, 0); // placeholder: fixed pixels are left out of adjusting and dithering
+                    continue;
+                }
+                c.Rgb[i * 3] = (p >> 16) & 255;
+                c.Rgb[i * 3 + 1] = (p >> 8) & 255;
+                c.Rgb[i * 3 + 2] = p & 255;
+                c.Fixed[i] = -1;
+            }
+            var dst = Quantize(c, opt);
+            for (int i = 0; i < transparent.Length; i++)
+                if (transparent[i]) dst.Index[i] = IndexedImage.Transparent;
+            return dst;
+        }
+
         public static IndexedImage Quantize(Composite src, QuantizeOptions opt)
         {
             int w = src.Width, h = src.Height, n = w * h;

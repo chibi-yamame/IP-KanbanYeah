@@ -17,7 +17,7 @@ namespace KanbanDrawer.Tests
         public void FrameCost()
         {
             var doc = new BoardDoc();
-            doc.Picture = new Raster(320, 240, Enumerable.Range(0, 76800).Select(i => unchecked((int)0xFF000000) | (int)((uint)i * 2654435761u % 0xFFFFFF)).ToArray());
+            doc.Objects.Add(new PictureObject("p", new Raster(320, 240, Enumerable.Range(0, 76800).Select(i => unchecked((int)0xFF000000) | (int)((uint)i * 2654435761u % 0xFFFFFF)).ToArray())) { Cx = 160, Cy = 120 });
             var stamp = new StampObject("s", new Raster(300, 200, Enumerable.Repeat(unchecked((int)0xFFFF8000), 60000).ToArray())) { Cx = 160, Cy = 120, Scale = 0.4 };
             doc.Objects.Add(stamp);
             var text = new GdiTextRasterizer();

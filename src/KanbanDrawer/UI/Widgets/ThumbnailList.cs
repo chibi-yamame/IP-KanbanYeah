@@ -2,21 +2,29 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Linq;
 using System.Windows.Forms;
 
 namespace KanbanDrawer.UI.Widgets
 {
     /// <summary>
-    /// Wrapping list of picture tiles (library items). Click = <see cref="ItemClicked"/>; right click offers 削除
-    /// (<see cref="DeleteRequested"/>) on deletable tiles. Selection is drawn as a ring.
+    /// Wrapping list of picture tiles (library items). Click = <see cref="ItemClicked"/> (use the item). Deletable tiles
+    /// can also be picked for deletion (<see cref="CheckedIds"/>, translucent blue + ✓): Ctrl+click toggles, Shift+click
+    /// picks a range, Ctrl+A picks all; a plain click clears the picks. Right click 削除 / the Delete key ask for
+    /// <see cref="DeleteRequested"/>. The item in use (<see cref="Selected"/>) is drawn as a ring, independently.
     /// </summary>
     internal sealed class ThumbnailList : FlowLayoutPanel
     {
         readonly Size tileSize;
         string selected;
+        readonly HashSet<string> picked = new HashSet<string>();
+        string anchor; // Shift+click range start
 
         public event Action<string> ItemClicked;
-        public event Action<string> DeleteRequested;
+        /// <summary>Ids to delete, in list order: the picks, or the right-clicked tile when it is not picked.</summary>
+        public event Action<IReadOnlyList<string>> DeleteRequested;
+        /// <summary><see cref="CheckedIds"/> changed.</summary>
+        public event Action CheckedChanged;
 
         public ThumbnailList(Size tileSize)
         {
@@ -25,12 +33,18 @@ namespace KanbanDrawer.UI.Widgets
             WrapContents = true;
             BackColor = Color.FromArgb(60, 60, 64);
             Padding = new Padding(2);
+            SetStyle(ControlStyles.Selectable, true); // takes focus for Ctrl+A / Delete
+            TabStop = true;
         }
+
+        IEnumerable<Tile> Tiles => Controls.OfType<Tile>();
 
         public void Clear()
         {
             foreach (Control c in Controls) c.Dispose();
             Controls.Clear();
+            anchor = null;
+            if (picked.Count > 0) { picked.Clear(); CheckedChanged?.Invoke(); }
         }
 
         /// <param name="image">tile picture (owned by the tile from now on), or null for a text tile</param>
@@ -38,46 +52,109 @@ namespace KanbanDrawer.UI.Widgets
         {
             var tile = new Tile(id, image, text, deletable) { Size = tileSize, Margin = new Padding(3) };
             tile.Selected = id == selected;
+            tile.MouseDown += (s, e) => Focus();
             tile.MouseUp += (s, e) =>
             {
-                if (e.Button == MouseButtons.Left) ItemClicked?.Invoke(id);
+                if (e.Button == MouseButtons.Left) OnTileClick(tile);
                 else if (e.Button == MouseButtons.Right && deletable)
                 {
+                    var ids = picked.Contains(id) ? CheckedIds : new[] { id };
                     var menu = new ContextMenuStrip();
-                    menu.Items.Add("削除", null, (s2, e2) => DeleteRequested?.Invoke(id));
+                    menu.Items.Add(ids.Count > 1 ? $"削除（{ids.Count} 個）" : "削除", null, (s2, e2) => DeleteRequested?.Invoke(ids));
                     menu.Show(tile, e.Location);
                 }
             };
             Controls.Add(tile);
         }
 
+        /// <summary>The item in use (ring).</summary>
         public string Selected
         {
             get => selected;
             set
             {
                 selected = value;
-                foreach (Control c in Controls)
-                    if (c is Tile t) t.Selected = t.Id == value;
+                foreach (var t in Tiles) t.Selected = t.Id == value;
             }
+        }
+
+        /// <summary>Picked ids, in list order.</summary>
+        public IReadOnlyList<string> CheckedIds => Tiles.Where(t => picked.Contains(t.Id)).Select(t => t.Id).ToList();
+
+        void OnTileClick(Tile tile)
+        {
+            var mods = ModifierKeys;
+            bool ctrl = (mods & Keys.Control) != 0, shift = (mods & Keys.Shift) != 0;
+            if (!ctrl && !shift)
+            {
+                anchor = tile.Deletable ? tile.Id : null;
+                SetPicked(Enumerable.Empty<string>());
+                ItemClicked?.Invoke(tile.Id);
+                return;
+            }
+            if (!tile.Deletable) return;
+            if (shift)
+            {
+                var all = Tiles.ToList();
+                int a = anchor == null ? -1 : all.FindIndex(t => t.Id == anchor);
+                int b = all.IndexOf(tile);
+                if (a < 0) a = b;
+                var range = all.Skip(Math.Min(a, b)).Take(Math.Abs(a - b) + 1).Where(t => t.Deletable).Select(t => t.Id);
+                SetPicked(ctrl ? picked.Concat(range) : range);
+            }
+            else
+            {
+                anchor = tile.Id;
+                var next = new HashSet<string>(picked);
+                if (!next.Remove(tile.Id)) next.Add(tile.Id);
+                SetPicked(next);
+            }
+        }
+
+        void SetPicked(IEnumerable<string> ids)
+        {
+            var next = new HashSet<string>(ids);
+            if (next.SetEquals(picked)) return;
+            picked.Clear();
+            picked.UnionWith(next);
+            foreach (var t in Tiles) t.Checked = picked.Contains(t.Id);
+            CheckedChanged?.Invoke();
+        }
+
+        protected override void OnKeyDown(KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.A && e.Control && !e.Shift && !e.Alt)
+            {
+                SetPicked(Tiles.Where(t => t.Deletable).Select(t => t.Id));
+                e.Handled = true;
+            }
+            else if (e.KeyCode == Keys.Delete && e.Modifiers == Keys.None && picked.Count > 0)
+            {
+                DeleteRequested?.Invoke(CheckedIds);
+                e.Handled = true;
+            }
+            else base.OnKeyDown(e);
         }
 
         sealed class Tile : Control
         {
             public readonly string Id;
+            public readonly bool Deletable;
             readonly Image image;
             readonly string text;
-            bool sel;
+            bool sel, check;
 
             public Tile(string id, Image image, string text, bool deletable)
             {
-                Id = id; this.image = image; this.text = text;
+                Id = id; Deletable = deletable; this.image = image; this.text = text;
                 SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint, true);
+                SetStyle(ControlStyles.Selectable, false); // focus stays on the list
                 Cursor = Cursors.Hand;
-                if (deletable) new ToolTip().SetToolTip(this, "クリック: 使う / 右クリック: 削除");
+                if (deletable) new ToolTip().SetToolTip(this, "クリック: 使う / Ctrl・Shift+クリック: 選ぶ / 右クリック: 削除");
             }
 
             public bool Selected { set { if (sel != value) { sel = value; Invalidate(); } } }
+            public bool Checked { set { if (check != value) { check = value; Invalidate(); } } }
 
             protected override void OnPaint(PaintEventArgs e)
             {
@@ -96,10 +173,22 @@ namespace KanbanDrawer.UI.Widgets
                     g.InterpolationMode = f >= 1 ? InterpolationMode.NearestNeighbor : InterpolationMode.HighQualityBicubic;
                     g.PixelOffsetMode = PixelOffsetMode.Half;
                     g.DrawImage(image, inner.Left + (inner.Width - w) / 2, inner.Top + (inner.Height - h) / 2, w, h);
+                    g.PixelOffsetMode = PixelOffsetMode.Default;
                 }
                 else
                 {
                     TextRenderer.DrawText(g, text, Font, inner, Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.WordBreak);
+                }
+                if (check)
+                {
+                    // picked for deletion: translucent blue + ✓ in the top right corner
+                    using (var b = new SolidBrush(Color.FromArgb(110, 30, 120, 255))) g.FillRectangle(b, 0, 0, Width, Height);
+                    g.SmoothingMode = SmoothingMode.AntiAlias;
+                    var c = new Rectangle(Width - 19, 3, 16, 16);
+                    using (var b = new SolidBrush(Color.FromArgb(0, 110, 230))) g.FillEllipse(b, c);
+                    using (var p = new Pen(Color.White, 2))
+                        g.DrawLines(p, new[] { new Point(c.Left + 4, c.Top + 8), new Point(c.Left + 7, c.Top + 11), new Point(c.Left + 12, c.Top + 5) });
+                    g.SmoothingMode = SmoothingMode.Default;
                 }
                 if (sel)
                     using (var p = new Pen(Color.FromArgb(0, 150, 255), 3)) g.DrawRectangle(p, 1, 1, Width - 3, Height - 3);

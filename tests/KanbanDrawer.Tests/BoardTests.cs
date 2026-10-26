@@ -64,7 +64,8 @@ namespace KanbanDrawer.Tests
             var pic = new Raster(320, 240);
             for (int y = 0; y < 240; y++)
                 for (int x = 0; x < 160; x++) pic[x, y] = unchecked((int)0xFF707070);
-            var doc = new BoardDoc { Frame = frame, Picture = pic };
+            var doc = new BoardDoc { Frame = frame };
+            doc.Objects.Add(new PictureObject("p", pic) { Cx = 160, Cy = 120 });
             var q = Quantizer.Quantize(Compositor.Build(doc, null), new QuantizeOptions { Dither = DitherKind.FloydSteinberg });
             for (int y = 0; y < 240; y++)
                 for (int x = 160; x < 320; x++) Assert.Equal(Palette.White, q[x, y]);
@@ -74,7 +75,8 @@ namespace KanbanDrawer.Tests
         [Fact]
         public void TransparentPictureShowsTheBackground()
         {
-            var doc = new BoardDoc { BackgroundColor = 8, Picture = new Raster(320, 240) };
+            var doc = new BoardDoc { BackgroundColor = 8 };
+            doc.Objects.Add(new PictureObject("p", new Raster(320, 240)) { Cx = 160, Cy = 120 });
             var q = Quantizer.Quantize(Compositor.Build(doc, null), new QuantizeOptions());
             Assert.All(q.Index, b => Assert.Equal(8, b));
         }
@@ -83,7 +85,7 @@ namespace KanbanDrawer.Tests
         public void TextIsFixedInItsColourWithOutline()
         {
             var doc = new BoardDoc();
-            doc.Picture = Solid(320, 240, unchecked((int)0xFF808080)); // under the text, gets dithered
+            doc.Objects.Add(new PictureObject("p", Solid(320, 240, unchecked((int)0xFF808080))) { Cx = 160, Cy = 120 }); // under the text, gets dithered
             var t = new TextObject { Text = "AB", Size = 20, Color = 4, Outline = 0, Cx = 160, Cy = 120 };
             var services = new BlockText();
             t.Measure(services);
@@ -326,7 +328,7 @@ namespace KanbanDrawer.Tests
         public void RenderingIsFastEnoughForDragging()
         {
             var doc = new BoardDoc();
-            doc.Picture = new Raster(320, 240, Enumerable.Range(0, 76800).Select(i => unchecked((int)0xFF000000) | (i * 2654435761 % 0xFFFFFF > 0 ? (int)(i * 2654435761u % 0xFFFFFF) : 0)).ToArray());
+            doc.Objects.Add(new PictureObject("p", new Raster(320, 240, Enumerable.Range(0, 76800).Select(i => unchecked((int)0xFF000000) | (i * 2654435761 % 0xFFFFFF > 0 ? (int)(i * 2654435761u % 0xFFFFFF) : 0)).ToArray())) { Cx = 160, Cy = 120 });
             var text = new GdiTextRasterizer();
             var t = new TextObject { Text = "テスト", Font = GdiTextRasterizer.DefaultFont(), Size = 30, Cx = 100, Cy = 60 };
             t.Measure(text);
