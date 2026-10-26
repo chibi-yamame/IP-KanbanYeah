@@ -5,8 +5,7 @@ using System.Linq;
 namespace KanbanDrawer.Core.Board
 {
     /// <summary>
-    /// The board being edited: background (colour or frame), the full-board picture, objects (stamps, text) in
-    /// z order (last = front), selection, snapshot undo/redo. Callers take <see cref="Checkpoint"/> before a change
+    /// The board being edited: background (colour or frame), objects (pictures, stamps, text) in z order (last = front), selection, snapshot undo/redo. Callers take <see cref="Checkpoint"/> before a change
     /// and call <see cref="NotifyChanged"/> after it.
     /// </summary>
     public sealed class BoardDoc
@@ -19,8 +18,6 @@ namespace KanbanDrawer.Core.Board
         /// <summary>Frame (320x240 palette image, already converted when registered) or null.</summary>
         public IndexedImage Frame;
         public string FrameId;
-        /// <summary>Full-board picture already placed on 320x240 (ARGB, transparent margins), or null.</summary>
-        public Raster Picture;
         public readonly List<BoardObject> Objects = new List<BoardObject>();
         public BoardObject Selected;
 
@@ -51,10 +48,13 @@ namespace KanbanDrawer.Core.Board
             return null;
         }
 
-        public void Add(BoardObject o)
+        public void Add(BoardObject o) => Insert(Objects.Count, o);
+
+        /// <summary>Adds an object at a z position (0 = the very back) and selects it.</summary>
+        public void Insert(int index, BoardObject o)
         {
             Checkpoint();
-            Objects.Add(o);
+            Objects.Insert(Math.Max(0, Math.Min(Objects.Count, index)), o);
             Select(o);
             NotifyChanged();
         }
@@ -114,7 +114,6 @@ namespace KanbanDrawer.Core.Board
             BackgroundColor = BackgroundColor,
             Frame = Frame,
             FrameId = FrameId,
-            Picture = Picture,
             Objects = Objects.Select(o => o.Clone()).ToList(),
             Selected = Selected == null ? -1 : Objects.IndexOf(Selected),
         };
@@ -124,7 +123,6 @@ namespace KanbanDrawer.Core.Board
             BackgroundColor = s.BackgroundColor;
             Frame = s.Frame;
             FrameId = s.FrameId;
-            Picture = s.Picture;
             Objects.Clear();
             Objects.AddRange(s.Objects.Select(o => o.Clone()));
             Selected = s.Selected >= 0 && s.Selected < Objects.Count ? Objects[s.Selected] : null;
@@ -138,13 +136,12 @@ namespace KanbanDrawer.Core.Board
             public int BackgroundColor;
             public IndexedImage Frame;
             public string FrameId;
-            public Raster Picture;
             public List<BoardObject> Objects;
             public int Selected;
         }
     }
 
-    /// <summary>Builds the composite: background (fixed) → picture (free) → objects in z order.</summary>
+    /// <summary>Builds the composite: background (fixed) → objects in z order.</summary>
     public static class Compositor
     {
         public static Composite Build(BoardDoc doc, IRenderServices services)
@@ -159,29 +156,19 @@ namespace KanbanDrawer.Core.Board
             foreach (var o in doc.Objects) o.Render(c, services);
         }
 
-        /// <summary>Background and picture only (what does not change while objects are dragged).</summary>
+        /// <summary>Background only (what does not change while objects are dragged).</summary>
         public static Composite BuildBase(BoardDoc doc)
         {
             var c = new Composite(BoardDoc.W, BoardDoc.H);
             int n = BoardDoc.W * BoardDoc.H;
             for (int i = 0; i < n; i++)
                 c.SetFixed(i, doc.Frame != null ? doc.Frame.Index[i] : doc.BackgroundColor);
-            if (doc.Picture != null)
-            {
-                var px = doc.Picture.Pixels;
-                for (int i = 0; i < n; i++)
-                {
-                    int p = px[i], a = (p >> 24) & 255;
-                    if (a == 0) continue;
-                    c.Blend(i, (p >> 16) & 255, (p >> 8) & 255, p & 255, a / 255.0);
-                }
-            }
             return c;
         }
     }
 
     /// <summary>
-    /// Keeps the background + picture composite between frames: while objects move, only they are rendered again
+    /// Keeps the background composite between frames: while objects move, only they are rendered again
     /// (on a copy of the cached base).
     /// </summary>
     public sealed class CompositeCache
@@ -189,14 +176,13 @@ namespace KanbanDrawer.Core.Board
         Composite baseLayer;
         int bg = -1;
         IndexedImage frame;
-        Raster picture;
 
         public Composite Build(BoardDoc doc, IRenderServices services)
         {
-            if (baseLayer == null || bg != doc.BackgroundColor || !ReferenceEquals(frame, doc.Frame) || !ReferenceEquals(picture, doc.Picture))
+            if (baseLayer == null || bg != doc.BackgroundColor || !ReferenceEquals(frame, doc.Frame))
             {
                 baseLayer = Compositor.BuildBase(doc);
-                bg = doc.BackgroundColor; frame = doc.Frame; picture = doc.Picture;
+                bg = doc.BackgroundColor; frame = doc.Frame;
             }
             var c = baseLayer.Clone();
             Compositor.AddObjects(doc, c, services);
