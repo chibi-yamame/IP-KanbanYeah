@@ -2,13 +2,15 @@
 
 [![CI](https://github.com/chibi-yamame/IP-KanbanYeah/actions/workflows/ci.yml/badge.svg)](https://github.com/chibi-yamame/IP-KanbanYeah/actions/workflows/ci.yml)
 
+<img width="64" height="64" alt="KanbanYeah_icon512" src="https://github.com/user-attachments/assets/8009e881-51c3-4c1e-b0bb-d86bcc496530" />
+
 Windows 版 InterPot3 の看板エディタに、好きな絵を自動で描くツールです。
 
 - `KanbanYeah.exe` 1 つで動きます（Windows 10 / 11、追加インストール不要、管理者権限不要）。
 - 画像・スタンプ・文字・フレームを組み合わせて看板を作り、看板の 10 色・1px ペンで描きます。描いたあとの「保存」はご自身で押してください。
 - 描画中もマウスは自由に使えます（既定の「バックグラウンド」方式）。
 
-<img width="739" height="632" alt="image" src="https://github.com/user-attachments/assets/ecddf8af-3b83-4c60-9cef-a6f9f40eae34" />
+<img width="742" height="628" alt="image" src="https://github.com/user-attachments/assets/cbf093e5-fe57-479b-8f81-7a296252b129" />
 
 ## 入手
 [Releases](https://github.com/chibi-yamame/IP-KanbanYeah/releases) から `KanbanYeah-<版>.zip` をダウンロードして展開します。
