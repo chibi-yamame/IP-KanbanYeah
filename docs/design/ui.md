@@ -15,8 +15,9 @@
 - 目安時間 = ストローク数 × 方式別の実測値（Post 2.3ms、Send 18ms）+ 色切替 × 0.15 秒 + 2 秒。
 
 ## 設定（`UI/Settings`）
-`AppPaths.DataDir\settings.txt`（key=value）。全体: `input`, `tab`。Feature ごと: `fit`, `folder`（画像）、`dither`, `strength`, `colors`
-（減色）、`frame.*`, `stamp.*`, `text.*`。壊れていても既定値で起動する。
+`AppPaths.DataDir\settings.txt`（key=value）。全体: `input`, `tabName`（前回のタブをタブ名で。順番が変わってもずれない。
+旧版の `tab`〔番号〕は読まない）。Feature ごと: `picture.fit`, `folder`（画像）、`dither`, `strength`, `colors`（減色）、
+`frame.*`, `stamp.*`, `text.*`。壊れていても既定値で起動する。
 
 ## CLI（`Program.Cli`）
 ```

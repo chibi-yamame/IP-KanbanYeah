@@ -5,7 +5,7 @@
 
 | 設計書 | 範囲 | 読むとき |
 |---|---|---|
-| [features.md](features.md) | 編集機能: Feature 構成（`IFeature` / `EditorHost` / `FeatureRegistry`）、層（下地・画像・スタンプ・文字）、固定画素つき減色、ライブラリ、`EditorView` | タブを足す・消す、スタンプ / 文字 / フレームを変える |
+| [features.md](features.md) | 編集機能: Feature 構成（`IFeature` / `EditorHost` / `FeatureRegistry`）、層（下地 + オブジェクト〔画像・スタンプ・文字〕）、固定画素つき減色、ライブラリ、`EditorView` | タブを足す・消す、スタンプ / 文字 / フレームを変える |
 | [image.md](image.md) | 画像の読み込み・配置（320x240）・調整・減色・ディザ | 減色の見た目や速度を変える |
 | [strokes.md](strokes.md) | ストローク計画: CLR 色の選択、色順の貪欲法、重ね塗りによるラン延長、縦横の選択 | 描く本数を減らす・順序を変える |
 | [locate.md](locate.md) | 看板の自動検出、ボタン位置（原作定数）、押下状態の判定 | 検出が失敗する・原作の配置が違う |
@@ -19,7 +19,7 @@
 
 ## 全体の流れ
 ```
-各タブ（Feature）─▶ BoardDoc（下地・画像・スタンプ・文字）─ Compositor ─▶ Composite（RGB + 固定画素）
+各タブ（Feature）─▶ BoardDoc（下地 + 画像・スタンプ・文字）  ─ Compositor ─▶ Composite（RGB + 固定画素）
                                                    ─ Quantizer ─▶ IndexedImage ─ StrokePlanner ─▶ DrawPlan
                                                                                                 │
 画面 ─ ScreenCapture ─ BoardLocator ─▶ キャンバス原点 ──────────────────────────────▶ DrawSession ◀┘
