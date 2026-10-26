@@ -29,9 +29,11 @@ namespace KanbanDrawer.UI.Features
         {
             host = h;
             var p = new StackPanel();
-            p.Controls.Add(Ui.Note("クリックで看板の中央に等倍（100%）で置きます。右クリックで削除。", 18));
+            p.Controls.Add(Ui.Note("クリックで看板の中央に等倍（100%）で置きます。\nCtrl / Shift+クリックで選んで、右クリック・Delete キーで削除。", 34));
             p.Controls.Add(list);
             p.Controls.Add(Ui.Buttons(Ui.Button("スタンプを登録...", Register), removeBg));
+            var del = new LibraryDelete(host, host.Stamps, list, "スタンプ", Reload);
+            p.Controls.Add(Ui.Buttons(del.DeleteButton, del.UndoButton));
             p.Controls.Add(Ui.Note("複数の画像をまとめて選べます。320×240 より大きい画像は登録しません。", 18));
 
             var box = new StackPanel { Height = 170, Padding = new Padding(0), AutoScroll = false };
@@ -47,7 +49,6 @@ namespace KanbanDrawer.UI.Features
             p.Controls.Add(box);
 
             list.ItemClicked += Place;
-            list.DeleteRequested += Delete;
             size.ValueChanged += (s, e) => Edit(() => current.Scale = size.Value / 100.0);
             angle.ValueChanged += (s, e) => Edit(() => current.Rot = angle.Value * Math.PI / 180);
             host.Doc.Changed += () => { if (current != null) Show(current); };
@@ -153,14 +154,6 @@ namespace KanbanDrawer.UI.Features
             if (skipped.Count > 0)
                 MessageBox.Show(host.Owner, $"{added.Count} 個登録しました。次の {skipped.Count} 個は登録していません（320×240 まで）:\n"
                     + string.Join("\n", skipped), "スタンプ");
-        }
-
-        void Delete(string id)
-        {
-            if (MessageBox.Show(host.Owner, "このスタンプをライブラリから削除しますか？（看板に置いたものは残ります）", "スタンプ",
-                    MessageBoxButtons.OKCancel) != DialogResult.OK) return;
-            host.Stamps.Delete(id);
-            Reload();
         }
     }
 }
