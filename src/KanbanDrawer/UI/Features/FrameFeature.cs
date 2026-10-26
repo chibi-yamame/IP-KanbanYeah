@@ -10,9 +10,9 @@ namespace KanbanDrawer.UI.Features
 {
     /// <summary>
     /// 下地: the bottom layer. A background palette colour and, chosen separately, an optional registered frame: a
-    /// picture converted to 320x240 palette colours when it is registered (with the 減色 settings of that moment,
-    /// transparency kept) and kept in the frame library. The background colour shows through the frame's transparent
-    /// pixels and the picture's margins.
+    /// picture placed on 320x240 when it is registered (background removal if ticked, full colour, transparency kept)
+    /// and kept in the frame library. Its colours are quantized with the draft like pictures and stamps. The background
+    /// colour shows through the frame's transparent pixels and the picture's margins.
     /// </summary>
     internal sealed class FrameFeature : IFeature
     {
@@ -20,6 +20,7 @@ namespace KanbanDrawer.UI.Features
         EditorHost host;
         readonly PaletteSwatches color = new PaletteSwatches(false, Palette.White);
         readonly ComboBox fit = Ui.DropDown("トリミングして埋める", "全体を収める", "引き伸ばす");
+        readonly CheckBox removeBg = new CheckBox { Text = "背景を消す", AutoSize = true, Checked = false };
         readonly ThumbnailList list = new ThumbnailList(new Size(84, 65)) { Height = 230 };
         string folder = "";
 
@@ -36,11 +37,11 @@ namespace KanbanDrawer.UI.Features
             p.Controls.Add(Ui.Note("フレームの透明部分や、何も置いていない所に見える色です。", 18));
             p.Controls.Add(Ui.Heading("フレーム"));
             p.Controls.Add(list);
-            p.Controls.Add(Ui.Buttons(Ui.Button("フレームを登録...", Register)));
+            p.Controls.Add(Ui.Buttons(Ui.Button("フレームを登録...", Register), removeBg));
             var del = new LibraryDelete(host, host.Frames, list, "フレーム", Reload);
             p.Controls.Add(Ui.Buttons(del.DeleteButton, del.UndoButton));
             p.Controls.Add(Ui.Row("合わせ方", fit));
-            p.Controls.Add(Ui.Note("登録時に 320×240 にして、今の「減色」の設定で 10 色にして保存します。透明な部分（「全体を収める」の余白も）は透明のまま残ります。\nCtrl / Shift+クリックで選んで、右クリック・Delete キーで削除できます。", 50));
+            p.Controls.Add(Ui.Note("登録時に 320×240 にして保存します。色は下書きのときに、画像・スタンプと一緒に 10 色にします。透明な部分（「全体を収める」の余白も）は透明のまま残ります。\nCtrl / Shift+クリックで選んで、右クリック・Delete キーで削除できます。", 66));
             color.SelectedChanged += (s, e) =>
             {
                 host.EndCheckpointBurst();
@@ -64,6 +65,7 @@ namespace KanbanDrawer.UI.Features
             host.Doc.BackgroundColor = c;
             fit.SelectedIndex = Math.Max(0, Math.Min(2, s.Get("frame.fit", 0)));
             folder = s.Get("frame.folder", "");
+            removeBg.Checked = s.Get("frame.removeBg", 0) != 0;
         }
 
         public void Save(Settings s)
@@ -71,6 +73,7 @@ namespace KanbanDrawer.UI.Features
             s.Set("frame.color", color.Selected);
             s.Set("frame.fit", fit.SelectedIndex);
             s.Set("frame.folder", folder);
+            s.Set("frame.removeBg", removeBg.Checked ? 1 : 0);
         }
 
         void SyncFromDoc()
@@ -98,11 +101,16 @@ namespace KanbanDrawer.UI.Features
         void Select(string id)
         {
             if ((host.Doc.FrameId ?? None) == id) return;
-            IndexedImage frame = null;
+            Raster frame = null;
             if (id != None)
             {
-                try { frame = host.Frames.LoadIndexed(id); }
+                try { frame = host.Frames.Load(id); }
                 catch (Exception e) { host.Log("フレームを読めませんでした: " + e.Message); return; }
+                if (frame.Width != BoardDoc.W || frame.Height != BoardDoc.H)
+                {
+                    host.Log($"フレームが 320×240 ではありません: {frame.Width}×{frame.Height}");
+                    return;
+                }
             }
             host.EndCheckpointBurst();
             host.Doc.Checkpoint();
@@ -122,10 +130,7 @@ namespace KanbanDrawer.UI.Features
             }
             try
             {
-                Raster placed;
-                using (var bmp = ImageLoader.Load(path)) placed = ImageLoader.Fit(bmp, FitModes[fit.SelectedIndex]);
-                var indexed = Quantizer.QuantizeFrame(placed, host.Quantize);
-                string id = host.Frames.Add(indexed.ToRaster());
+                string id = host.Frames.Register(path, FitModes[fit.SelectedIndex], removeBg.Checked);
                 folder = System.IO.Path.GetDirectoryName(path);
                 host.Log($"フレームを登録しました: {System.IO.Path.GetFileName(path)}");
                 Reload();

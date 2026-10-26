@@ -42,29 +42,21 @@ namespace KanbanDrawer.Tests
         }
 
         [Fact]
-        public void BackgroundAndFrameAreFixed()
+        public void BackgroundColourIsFixed()
         {
             var doc = new BoardDoc { BackgroundColor = 6 };
             var c = Compositor.Build(doc, new BlockText());
             Assert.All(c.Fixed, f => Assert.Equal(6, f));
-
-            var frame = new IndexedImage(320, 240);
-            for (int i = 0; i < frame.Index.Length; i++) frame.Index[i] = (byte)(i % 10);
-            doc.Frame = frame;
-            var q = Quantizer.Quantize(Compositor.Build(doc, new BlockText()), new QuantizeOptions());
-            Assert.Equal(frame.Index, q.Index); // frames come out exactly as registered
         }
 
         [Fact]
-        public void DitheringOnThePictureDoesNotLeakIntoTheFrame()
+        public void DitheringOnThePictureDoesNotLeakIntoTheBackground()
         {
-            var frame = new IndexedImage(320, 240);
-            for (int i = 0; i < frame.Index.Length; i++) frame.Index[i] = Palette.White;
             // a grey picture covering the left half only: dithers into black/grey/white
             var pic = new Raster(320, 240);
             for (int y = 0; y < 240; y++)
                 for (int x = 0; x < 160; x++) pic[x, y] = unchecked((int)0xFF707070);
-            var doc = new BoardDoc { Frame = frame };
+            var doc = new BoardDoc { BackgroundColor = Palette.White };
             doc.Objects.Add(new PictureObject("p", pic) { Cx = 160, Cy = 120 });
             var q = Quantizer.Quantize(Compositor.Build(doc, null), new QuantizeOptions { Dither = DitherKind.FloydSteinberg });
             for (int y = 0; y < 240; y++)
@@ -274,24 +266,6 @@ namespace KanbanDrawer.Tests
                 Assert.Equal(new[] { a, b }, lib.Ids());
                 lib.Delete(a);
                 Assert.Equal(new[] { b }, lib.Ids());
-            }
-            finally
-            {
-                try { Directory.Delete(root, true); } catch (IOException) { }
-            }
-        }
-
-        [Fact]
-        public void FramesComeBackAsPaletteIndices()
-        {
-            string root = Path.Combine(Path.GetTempPath(), "kd-test-" + Guid.NewGuid().ToString("N"));
-            try
-            {
-                var lib = new FrameLibrary(root);
-                var img = new IndexedImage(320, 240);
-                for (int i = 0; i < img.Index.Length; i++) img.Index[i] = (byte)((i / 7) % 10);
-                string id = lib.Add(img.ToRaster());
-                Assert.Equal(img.Index, lib.LoadIndexed(id).Index);
             }
             finally
             {

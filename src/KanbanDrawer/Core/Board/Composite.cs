@@ -4,7 +4,7 @@ namespace KanbanDrawer.Core.Board
 {
     /// <summary>
     /// The board before quantization: RGB per pixel (0..255 floats) plus, per pixel, a fixed palette index
-    /// (frame, background colour, text) or -1 when the pixel is free (picture, stamps) and gets quantized.
+    /// (background colour, text) or -1 when the pixel is free (frame, pictures, stamps) and gets quantized.
     /// </summary>
     public sealed class Composite
     {

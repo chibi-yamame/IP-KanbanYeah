@@ -4,8 +4,11 @@
 任意の画像を看板の 320x240・10 色に変換する。見た目と「描く本数（＝時間）」のバランスをユーザーが選べるようにする。
 
 ## 入口
-- `Win/ImageLoader.Load` → `ImageLoader.Fit(bitmap, FitMode)` → `Core/Quantizer.Quantize(raster, QuantizeOptions)`
-- UI: `MainForm.Convert`（設定変更から 150ms デバウンス、減色と計画はバックグラウンド）。CLI: `--quantize` / `--draw`
+- 画面: 画像・スタンプ・フレームはフルカラーのまま看板に合成し（`Compositor` → `Composite`、[features.md](features.md)）、
+  「下書き」のときに `Core/Quantizer.Quantize(Composite, QuantizeOptions)` でまとめて減色する（固定画素 = 背景色・文字はそのまま）。
+  画像の読み込みは `Win/ImageLoader.Load` → `ToRaster`（長辺 1280px 超は `PictureObject.Shrink`）、配置はオブジェクトの倍率。
+- `ImageLoader.Fit(bitmap, FitMode)`（320x240 への配置）を使うのは、フレームの登録と CLI（`--quantize` / `--draw`:
+  `Fit` → `Quantizer.Quantize(raster, QuantizeOptions)`、透明は `--bg` の色）。
 
 ## クラス
 | クラス | 役割 |
@@ -21,7 +24,7 @@
 - 最近色は CIELAB のユークリッド距離（ΔE76）。使わない色（`Enabled[i] = false`）は候補から外す。
 - ディザ: なし / Floyd–Steinberg（蛇行走査）/ Atkinson（誤差 6/8 のみ拡散、明るめでコントラスト高）/ Bayer 4x4
   （閾値 ±48 × 強さ を RGB に加算）。誤差拡散は sRGB 空間で行い、強さ（0–1）を誤差に掛ける。
-- 透明部分は「余白・透明色」（パレットのどれか）に合成。Contain の余白も透明 → 同じ色になる。
+- 透明部分は下にあるものと混ぜる（画面では下地 = 背景色・フレーム、CLI は `--bg` の色）。Contain の余白も透明。
 
 ## 描く本数への影響（スクショ画像 608x469 → Contain、実測）
 | ディザ | ストローク数 | 目安 (PostMessage) |

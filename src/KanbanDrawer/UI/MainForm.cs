@@ -75,7 +75,9 @@ namespace KanbanDrawer.UI
             }
             foreach (var f in features) f.Load(settings);
             inputMode.SelectedIndex = Math.Max(0, Math.Min(Modes.Length - 1, settings.Get("input", 0)));
-            tabs.SelectedIndex = Math.Max(0, Math.Min(tabs.TabCount - 1, settings.Get("tab", 0)));
+            // the last tab by its name (the order may change between versions); the first tab otherwise
+            string tab = settings.Get("tabName", "");
+            tabs.SelectedIndex = Math.Max(0, features.FindIndex(f => f.Title == tab));
 
             host.DraftChanged += OnDraftChanged;
             host.QuantizeChanged += () => { if (draftView.Checked) host.MakeDraft(); }; // keep a shown draft current
@@ -250,7 +252,7 @@ namespace KanbanDrawer.UI
         {
             foreach (var f in features) f.Save(settings);
             settings.Set("input", inputMode.SelectedIndex);
-            settings.Set("tab", tabs.SelectedIndex);
+            settings.Set("tabName", features[tabs.SelectedIndex].Title);
             settings.Save();
         }
 

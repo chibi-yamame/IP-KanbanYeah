@@ -35,15 +35,9 @@ namespace KanbanDrawer.Core
         }
     }
 
-    /// <summary>
-    /// Palette indices (0..Palette.Count-1), row major. Frames may also hold <see cref="Transparent"/>; the composite
-    /// replaces it with the background colour, so what is quantized / drawn never contains it.
-    /// </summary>
+    /// <summary>Palette indices (0..Palette.Count-1), row major.</summary>
     public sealed class IndexedImage
     {
-        /// <summary>Index of a transparent pixel (frames only).</summary>
-        public const byte Transparent = 255;
-
         public int Width { get; }
         public int Height { get; }
         public byte[] Index { get; }
@@ -66,15 +60,15 @@ namespace KanbanDrawer.Core
         {
             var r = new Raster(Width, Height);
             for (int i = 0; i < Index.Length; i++)
-                r.Pixels[i] = Index[i] < Palette.Count ? unchecked((int)0xFF000000) | Palette.All[Index[i]].Rgb : 0; // transparent: alpha 0
+                r.Pixels[i] = unchecked((int)0xFF000000) | Palette.All[Index[i]].Rgb;
             return r;
         }
 
-        /// <summary>Pixel count per palette index (transparent pixels are not counted).</summary>
+        /// <summary>Pixel count per palette index.</summary>
         public int[] Histogram()
         {
             var h = new int[Palette.Count];
-            foreach (var b in Index) if (b < Palette.Count) h[b]++;
+            foreach (var b in Index) h[b]++;
             return h;
         }
     }
