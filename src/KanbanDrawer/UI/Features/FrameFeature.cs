@@ -40,8 +40,7 @@ namespace KanbanDrawer.UI.Features
             var del = new LibraryDelete(host, host.Frames, list, "フレーム", Reload);
             p.Controls.Add(Ui.Buttons(del.DeleteButton, del.UndoButton));
             p.Controls.Add(Ui.Row("合わせ方", fit));
-            p.Controls.Add(Ui.Note("登録時に 320×240 にして、今の「減色」の設定で 10 色にして保存します。透明な部分（「全体を収める」の余白も）は透明のまま残ります。
-Ctrl / Shift+クリックで選んで、右クリック・Delete キーで削除できます。", 50));
+            p.Controls.Add(Ui.Note("登録時に 320×240 にして、今の「減色」の設定で 10 色にして保存します。透明な部分（「全体を収める」の余白も）は透明のまま残ります。\nCtrl / Shift+クリックで選んで、右クリック・Delete キーで削除できます。", 50));
             color.SelectedChanged += (s, e) =>
             {
                 host.EndCheckpointBurst();

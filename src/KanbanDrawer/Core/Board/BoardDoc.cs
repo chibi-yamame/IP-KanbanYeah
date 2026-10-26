@@ -5,17 +5,18 @@ using System.Linq;
 namespace KanbanDrawer.Core.Board
 {
     /// <summary>
-    /// The board being edited: background (colour or frame), objects (pictures, stamps, text) in z order (last = front), selection, snapshot undo/redo. Callers take <see cref="Checkpoint"/> before a change
-    /// and call <see cref="NotifyChanged"/> after it.
+    /// The board being edited: background (colour and frame), objects (pictures, stamps, text) in z order (last = front),
+    /// selection, snapshot undo/redo. Callers take <see cref="Checkpoint"/> before a change and call
+    /// <see cref="NotifyChanged"/> after it.
     /// </summary>
     public sealed class BoardDoc
     {
         public const int W = BoardGeometry.Width, H = BoardGeometry.Height;
         const int UndoDepth = 50;
 
-        /// <summary>Palette index of the plain background (used when there is no frame).</summary>
+        /// <summary>Palette index of the background (shows where there is no frame or the frame is transparent).</summary>
         public int BackgroundColor = Palette.White;
-        /// <summary>Frame (320x240 palette image, already converted when registered) or null.</summary>
+        /// <summary>Frame (320x240 palette image, already converted when registered, may hold <see cref="IndexedImage.Transparent"/>) or null.</summary>
         public IndexedImage Frame;
         public string FrameId;
         public readonly List<BoardObject> Objects = new List<BoardObject>();
