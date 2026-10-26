@@ -88,12 +88,15 @@ namespace KanbanDrawer.Win
         public StampLibrary(string root = null) : base("stamps", "s", root) { }
     }
 
-    /// <summary>Frames: 320x240 pictures already in palette colours (converted when registered).</summary>
+    /// <summary>Frames: 320x240 pictures already in palette colours (converted when registered), transparent = alpha 0.</summary>
     public sealed class FrameLibrary : ImageLibrary
     {
         public FrameLibrary(string root = null) : base("frames", "f", root) { }
 
-        /// <summary>The frame as palette indices; colours that are not exact palette colours map to the nearest one.</summary>
+        /// <summary>
+        /// The frame as palette indices; alpha 0 becomes <see cref="IndexedImage.Transparent"/>, other colours that are
+        /// not exact palette colours map to the nearest one.
+        /// </summary>
         public IndexedImage LoadIndexed(string id)
         {
             var r = Load(id);
@@ -104,6 +107,7 @@ namespace KanbanDrawer.Win
             var img = new IndexedImage(r.Width, r.Height);
             for (int i = 0; i < r.Pixels.Length; i++)
             {
+                if (((r.Pixels[i] >> 24) & 255) == 0) { img.Index[i] = IndexedImage.Transparent; continue; }
                 int k = Palette.IndexOf(r.Pixels[i]);
                 img.Index[i] = (byte)(k >= 0 ? k : Quantizer.NearestExact((r.Pixels[i] >> 16) & 255, (r.Pixels[i] >> 8) & 255, r.Pixels[i] & 255, all));
             }

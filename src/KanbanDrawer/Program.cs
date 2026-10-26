@@ -164,11 +164,11 @@ namespace KanbanDrawer
             return 0;
         }
 
-        /// <summary>Adds a picture to the frame library: placed on 320x240 and quantized (options given before it apply).</summary>
+        /// <summary>Adds a picture to the frame library: placed on 320x240 and quantized, transparency kept (options given before it apply).</summary>
         static int RegisterFrame(string path, FitMode fit, QuantizeOptions q)
         {
             IndexedImage img;
-            using (var bmp = ImageLoader.Load(path)) img = Quantizer.Quantize(ImageLoader.Fit(bmp, fit), q);
+            using (var bmp = ImageLoader.Load(path)) img = Quantizer.QuantizeFrame(ImageLoader.Fit(bmp, fit), q);
             Log("frame: " + new FrameLibrary().Add(img.ToRaster()));
             return 0;
         }

@@ -165,7 +165,7 @@ namespace KanbanDrawer.Core.Board
             var c = new Composite(BoardDoc.W, BoardDoc.H);
             int n = BoardDoc.W * BoardDoc.H;
             for (int i = 0; i < n; i++)
-                c.SetFixed(i, doc.Frame != null ? doc.Frame.Index[i] : doc.BackgroundColor);
+                c.SetFixed(i, doc.Frame != null && doc.Frame.Index[i] != IndexedImage.Transparent ? doc.Frame.Index[i] : doc.BackgroundColor);
             if (doc.Picture != null)
             {
                 var px = doc.Picture.Pixels;
