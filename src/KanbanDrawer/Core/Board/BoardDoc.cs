@@ -16,8 +16,8 @@ namespace KanbanDrawer.Core.Board
 
         /// <summary>Palette index of the background (shows where there is no frame or the frame is transparent).</summary>
         public int BackgroundColor = Palette.White;
-        /// <summary>Frame (320x240 palette image, already converted when registered, may hold <see cref="IndexedImage.Transparent"/>) or null.</summary>
-        public IndexedImage Frame;
+        /// <summary>Frame (320x240 ARGB picture, full colour, quantized with the draft like pictures and stamps) or null.</summary>
+        public Raster Frame;
         public string FrameId;
         public readonly List<BoardObject> Objects = new List<BoardObject>();
         public BoardObject Selected;
@@ -135,14 +135,14 @@ namespace KanbanDrawer.Core.Board
         sealed class Snapshot
         {
             public int BackgroundColor;
-            public IndexedImage Frame;
+            public Raster Frame;
             public string FrameId;
             public List<BoardObject> Objects;
             public int Selected;
         }
     }
 
-    /// <summary>Builds the composite: background (fixed) → objects in z order.</summary>
+    /// <summary>Builds the composite: background colour (fixed) → frame (free) → objects in z order.</summary>
     public static class Compositor
     {
         public static Composite Build(BoardDoc doc, IRenderServices services)
@@ -157,13 +157,22 @@ namespace KanbanDrawer.Core.Board
             foreach (var o in doc.Objects) o.Render(c, services);
         }
 
-        /// <summary>Background only (what does not change while objects are dragged).</summary>
+        /// <summary>
+        /// Background only (what does not change while objects are dragged): the background colour as fixed pixels, the
+        /// frame blended over it (its pixels become free; semi-transparent edges mix with the background colour).
+        /// </summary>
         public static Composite BuildBase(BoardDoc doc)
         {
             var c = new Composite(BoardDoc.W, BoardDoc.H);
             int n = BoardDoc.W * BoardDoc.H;
+            for (int i = 0; i < n; i++) c.SetFixed(i, doc.BackgroundColor);
+            var f = doc.Frame;
+            if (f == null || f.Width != BoardDoc.W || f.Height != BoardDoc.H) return c;
             for (int i = 0; i < n; i++)
-                c.SetFixed(i, doc.Frame != null && doc.Frame.Index[i] != IndexedImage.Transparent ? doc.Frame.Index[i] : doc.BackgroundColor);
+            {
+                int p = f.Pixels[i];
+                c.Blend(i, (p >> 16) & 255, (p >> 8) & 255, p & 255, ((p >> 24) & 255) / 255.0);
+            }
             return c;
         }
     }
@@ -176,7 +185,7 @@ namespace KanbanDrawer.Core.Board
     {
         Composite baseLayer;
         int bg = -1;
-        IndexedImage frame;
+        Raster frame;
 
         public Composite Build(BoardDoc doc, IRenderServices services)
         {

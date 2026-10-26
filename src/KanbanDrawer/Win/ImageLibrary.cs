@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using KanbanDrawer.Core;
+using KanbanDrawer.Core.Board;
 
 namespace KanbanDrawer.Win
 {
@@ -180,30 +181,29 @@ namespace KanbanDrawer.Win
         public StampLibrary(string root = null) : base("stamps", "s", root) { }
     }
 
-    /// <summary>Frames: 320x240 pictures already in palette colours (converted when registered), transparent = alpha 0.</summary>
+    /// <summary>
+    /// Frames: 320x240 full colour pictures (ARGB, alpha kept), quantized with the draft like pictures and stamps.
+    /// Frames saved by older versions (opaque pictures already in palette colours) load the same way.
+    /// </summary>
     public sealed class FrameLibrary : ImageLibrary
     {
         public FrameLibrary(string root = null) : base("frames", "f", root) { }
 
-        /// <summary>
-        /// The frame as palette indices; alpha 0 becomes <see cref="IndexedImage.Transparent"/>, other colours that are
-        /// not exact palette colours map to the nearest one.
-        /// </summary>
-        public IndexedImage LoadIndexed(string id)
+        /// <summary>Registers a picture file (as the 下地 tab does, see <see cref="Prepare"/>); returns its id.</summary>
+        public string Register(string path, FitMode fit, bool removeBackground)
         {
-            var r = Load(id);
-            if (r.Width != BoardGeometry.Width || r.Height != BoardGeometry.Height)
-                throw new InvalidDataException("frame is not 320x240");
-            var all = new bool[Palette.Count];
-            for (int i = 0; i < all.Length; i++) all[i] = true;
-            var img = new IndexedImage(r.Width, r.Height);
-            for (int i = 0; i < r.Pixels.Length; i++)
-            {
-                if (((r.Pixels[i] >> 24) & 255) == 0) { img.Index[i] = IndexedImage.Transparent; continue; }
-                int k = Palette.IndexOf(r.Pixels[i]);
-                img.Index[i] = (byte)(k >= 0 ? k : Quantizer.NearestExact((r.Pixels[i] >> 16) & 255, (r.Pixels[i] >> 8) & 255, r.Pixels[i] & 255, all));
-            }
-            return img;
+            using (var bmp = ImageLoader.Load(path)) return Add(Prepare(bmp, fit, removeBackground));
+        }
+
+        /// <summary>
+        /// Background removal (optional, as for stamps but without trimming) → placed on 320x240 with the fit mode.
+        /// The colours are kept as they are (not quantized).
+        /// </summary>
+        public static Raster Prepare(Bitmap src, FitMode fit, bool removeBackground)
+        {
+            if (!removeBackground) return ImageLoader.Fit(src, fit);
+            var cut = StampPrep.RemoveBackground(ImageLoader.ToRaster(src), StampPrep.DefaultTolerance);
+            using (var bmp = ImageLoader.ToBitmap(cut)) return ImageLoader.Fit(bmp, fit);
         }
     }
 }

@@ -34,7 +34,7 @@ namespace KanbanDrawer
     ///   KanbanYeah.exe --detect [--log file]
     ///   KanbanYeah.exe --quantize pic.png --save-quantized out.png [options]
     ///   KanbanYeah.exe --register-stamp pic.png [--remove-bg]                  (adds to the stamp library)
-    ///   KanbanYeah.exe [--fit ...] [--dither ...] --register-frame pic.png     (adds to the frame library)
+    ///   KanbanYeah.exe [--fit ...] --register-frame pic.png [--remove-bg]      (adds to the frame library)
     /// Settings and libraries live in %APPDATA%\KanbanDrawer, or in the folder named by KANBANDRAWER_DATA.
     /// </summary>
     internal static class Cli
@@ -68,7 +68,8 @@ namespace KanbanDrawer
                         case "--compare": return Compare(Next(), Next());
                         case "--dotfont-dump": return DotFontDump(Next(), Next(), Next());
                         case "--register-stamp": return RegisterStamp(Next(), Array.IndexOf(args, "--remove-bg") >= 0);
-                        case "--register-frame": return RegisterFrame(Next(), fit, q);
+                        case "--register-frame": return RegisterFrame(Next(), fit, Array.IndexOf(args, "--remove-bg") >= 0);
+                        case "--remove-bg": break; // read by --register-stamp / --register-frame (either order)
                         case "--fit": fit = (FitMode)Enum.Parse(typeof(FitMode), Next(), true); break;
                         case "--dither": q.Dither = ParseDither(Next()); break;
                         case "--strength": q.Strength = int.Parse(Next()) / 100.0; break;
@@ -164,12 +165,13 @@ namespace KanbanDrawer
             return 0;
         }
 
-        /// <summary>Adds a picture to the frame library: placed on 320x240 and quantized, transparency kept (options given before it apply).</summary>
-        static int RegisterFrame(string path, FitMode fit, QuantizeOptions q)
+        /// <summary>
+        /// Adds a picture to the frame library (as the 下地 tab does): placed on 320x240 in full colour, transparency kept
+        /// (a --fit given before it applies; 減色 options are not used, frames are quantized with the draft).
+        /// </summary>
+        static int RegisterFrame(string path, FitMode fit, bool removeBackground)
         {
-            IndexedImage img;
-            using (var bmp = ImageLoader.Load(path)) img = Quantizer.QuantizeFrame(ImageLoader.Fit(bmp, fit), q);
-            Log("frame: " + new FrameLibrary().Add(img.ToRaster()));
+            Log("frame: " + new FrameLibrary().Register(path, fit, removeBackground));
             return 0;
         }
 
