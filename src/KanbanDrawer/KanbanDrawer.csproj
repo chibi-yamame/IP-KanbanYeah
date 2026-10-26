@@ -8,6 +8,7 @@
     <Nullable>disable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>app.ico</ApplicationIcon>
     <RootNamespace>KanbanDrawer</RootNamespace>
     <AssemblyName>KanbanYeah</AssemblyName>
     <Version>0.2.0</Version>
@@ -24,6 +25,11 @@
   <!-- 公式と同じ text: the program's renderer, run with the Java that opens .jar files (Java/KanbanText.java, tools/textjar.sh) -->
   <ItemGroup>
     <EmbeddedResource Include="Resources/kanban-text.jar" LogicalName="KanbanDrawer.kanban-text.jar" />
+  </ItemGroup>
+
+  <!-- the window / taskbar icon (the same file is the exe's icon); vector source app.svg, both made by the development tools -->
+  <ItemGroup>
+    <EmbeddedResource Include="app.ico" LogicalName="KanbanDrawer.app.ico" />
   </ItemGroup>
 
   <ItemGroup>
