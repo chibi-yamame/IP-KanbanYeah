@@ -47,7 +47,7 @@
 | クラス | 役割 |
 |---|---|
 | `GdiTextRasterizer` | `GraphicsPath.AddString` → 変換 → `SmoothingMode.None` で塗り（縁取りは `Widen`）→ 2 値マスク。フォントはインストール済み一覧（既定: Yu Gothic UI → メイリオ → …） |
-| `ImageLibrary` / `StampLibrary` / `FrameLibrary` | `AppPaths.DataDir\stamps|frames\<id>.png` + `index.txt`（1 行 1 id、壊れた行・無いファイル・パス文字を含む行は無視、.tmp 経由で保存）。フレームはパレット番号に戻して読む（PNG のアルファ 0 は透明に戻す。保存も透明はアルファ 0）。削除: `Delete(ids)` は削除の記録を返し、ファイルを `trash\` に移す（最後の 1 回分だけ保持、起動時に空にする。`index.txt` の対象外）。`Restore(記録)` で元の順番に戻す |
+| `ImageLibrary` / `StampLibrary` / `FrameLibrary` | `AppPaths.DataDir\stamps|frames\<id>.png` + `index.txt`（1 行 1 id、壊れた行・無いファイル・パス文字を含む行は無視、.tmp 経由で保存）。フレームはパレット番号に戻して読む（PNG のアルファ 0 は透明に戻す。保存も透明はアルファ 0）。削除: `Delete(ids)` は削除の記録を返し、ファイルを `trash\` に移す（最後の 1 回分だけ保持、`index.txt` の対象外。画面の起動時に `EmptyTrash`、CLI では空にしない＝画面を開いたまま CLI で登録しても「元に戻す」が消えない）。`Restore(記録)` で元の順番に戻す（削除後に一覧が変わっていれば、残っている直前の項目の後ろ） |
 | `AppPaths` | `%APPDATA%\KanbanDrawer`、または環境変数 `KANBANDRAWER_DATA`（テスト・持ち運び用） |
 
 ### UI（`UI/Features/`, `UI/Widgets/`, `UI/EditorView.cs`）
@@ -69,7 +69,7 @@ interface IAcceptsFiles { bool OpenFile(string path); } // ドロップされた
 - 設定キーは Feature ごとに接頭辞（`frame.` `stamp.` `text.` `picture.`〔`picture.fit` = 置き方〕。減色は初版からの `dither` 等）。
 - 部品: `ResetSlider`（Windows 標準の TrackBar、1 刻み・吸着なし。上に ▼ = 既定値に戻す（位置は TBM_GETCHANNELRECT /
   TBM_GETTHUMBRECT から計算）、左右に －／＋（1 ずつ、押し続けると連続）、値は右の固定幅欄）、`PaletteSwatches`（10 色、
-  「なし」付きも可）、`ThumbnailList`（タイル一覧。Ctrl+クリックで選択の切り替え、Shift+クリックで範囲、Ctrl+A ですべて。Ctrl / Shift 付きは「使う」をしない。選択中は半透明の青 + ✓、使用中の青い枠とは別。右クリック・Delete で削除）、`StackPanel` / `Ui.Row` 等。
+  「なし」付きも可）、`ThumbnailList`（タイル一覧。Ctrl+クリックで選択の切り替え、Shift+クリックで範囲、Ctrl+A ですべて。Ctrl / Shift 付きは「使う」をしない。選択中は半透明の青 + ✓、使用中の青い枠とは別。右クリック・Delete で削除）、`LibraryDelete`（スタンプ・下地共通の「選んだものを削除」「削除を元に戻す」とログ。確認ダイアログは出さない）、`StackPanel` / `Ui.Row` 等。
 - `EditorView`: 1 倍表示 + 周囲 10px の余白（看板の端のハンドルも掴める）。クリック = 最前面を選択、ドラッグ = 移動、角 = 拡縮、
   丸 = 回転、矢印 = 1px（Shift 10px）、Delete = 削除、Esc = 選択解除。表示はフルカラー（編集中）か下書き（10 色、`ShowDraft`。最新の下書きがあるときだけ）。
 - 描画（検出・入力方式・開始・続きから・中止・進捗・ログ）、下書き・表示切替、undo/redo・PNG 保存は Feature ではなく `MainForm` 常設。
