@@ -35,8 +35,10 @@ namespace KanbanDrawer.UI.Features
             p.Controls.Add(Ui.Heading("フレーム"));
             p.Controls.Add(list);
             p.Controls.Add(Ui.Buttons(Ui.Button("フレームを登録...", Register)));
+            var del = new LibraryDelete(host, host.Frames, list, "フレーム", Reload);
+            p.Controls.Add(Ui.Buttons(del.DeleteButton, del.UndoButton));
             p.Controls.Add(Ui.Row("合わせ方", fit));
-            p.Controls.Add(Ui.Note("登録時に 320×240 にして、今の「減色」の設定で 10 色にして保存します。\n右クリックで削除できます。", 34));
+            p.Controls.Add(Ui.Note("登録時に 320×240 にして、今の「減色」の設定で 10 色にして保存します。\n右クリック・Ctrl / Shift+クリックで選んで削除できます。", 34));
             color.SelectedChanged += (s, e) =>
             {
                 host.EndCheckpointBurst();
@@ -45,7 +47,6 @@ namespace KanbanDrawer.UI.Features
                 host.Doc.NotifyChanged();
             };
             list.ItemClicked += Select;
-            list.DeleteRequested += Delete;
             host.Doc.Changed += SyncFromDoc; // undo / redo
             Reload();
             return p;
@@ -134,14 +135,6 @@ namespace KanbanDrawer.UI.Features
             {
                 MessageBox.Show(host.Owner, "フレームを登録できませんでした: " + e.Message, "下地");
             }
-        }
-
-        void Delete(string id)
-        {
-            if (MessageBox.Show(host.Owner, "このフレームをライブラリから削除しますか？（看板に置いたものは残ります）", "下地",
-                    MessageBoxButtons.OKCancel) != DialogResult.OK) return;
-            host.Frames.Delete(id);
-            Reload();
         }
     }
 }
