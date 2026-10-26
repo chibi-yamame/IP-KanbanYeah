@@ -8,7 +8,7 @@ using KanbanDrawer.UI.Widgets;
 
 namespace KanbanDrawer.UI.Features
 {
-    /// <summary>減色: dithering and adjustments for the picture / stamps (frames and text keep their colours), colours used.</summary>
+    /// <summary>減色: dithering and adjustments for the frame / pictures / stamps (the background colour and text keep their colours), colours used.</summary>
     internal sealed class QuantizeFeature : IFeature
     {
         EditorHost host;
@@ -26,7 +26,7 @@ namespace KanbanDrawer.UI.Features
         {
             host = h;
             var p = new StackPanel();
-            p.Controls.Add(Ui.Note("「下書き」で使います。対象は画像とスタンプ（フレーム・文字は元の色のまま）。", 34));
+            p.Controls.Add(Ui.Note("「下書き」で使います。対象はフレーム・画像・スタンプ（背景色・文字は元の色のまま）。", 34));
             p.Controls.Add(Ui.Row("ディザ", dither));
             p.Controls.Add(Ui.Row("ディザの強さ", strength));
             p.Controls.Add(Ui.Row("明るさ", brightness));
