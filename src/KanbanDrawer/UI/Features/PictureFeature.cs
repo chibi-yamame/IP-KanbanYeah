@@ -12,7 +12,7 @@ namespace KanbanDrawer.UI.Features
     /// 画像: pictures opened from files (not registered) and placed on the board as objects, behind stamps and text.
     /// Placed by 置き方 (fit / cover / dot by dot), then moved, rotated and scaled like stamps.
     /// </summary>
-    internal sealed class PictureFeature : IFeature, IAcceptsFiles
+    internal sealed class PictureFeature : IFeature, IAcceptsFiles, IAcceptsPaste
     {
         static readonly PictureFit[] Fits = { PictureFit.Contain, PictureFit.Cover, PictureFit.Actual };
 
@@ -116,7 +116,23 @@ namespace KanbanDrawer.UI.Features
                 return false;
             }
             folder = Path.GetDirectoryName(path);
-            string file = Path.GetFileName(path);
+            Place(loaded, Path.GetFileName(path));
+            return true;
+        }
+
+        /// <summary>Pasted picture data: placed like an opened file; the open folder stays as it is.</summary>
+        public bool PasteImage(Raster image, string name)
+        {
+            if (image == null) return false;
+            Place(image, name);
+            return true;
+        }
+
+        public bool PasteText(string text) => false;
+
+        /// <summary>Shrinks (long side 1280), places by 置き方 and inserts at the very back, selected: one undo step.</summary>
+        void Place(Raster loaded, string file)
+        {
             var pic = PictureObject.Shrink(loaded);
             host.Log(pic == loaded
                 ? $"画像: {file} ({pic.Width}×{pic.Height})"
@@ -126,7 +142,6 @@ namespace KanbanDrawer.UI.Features
             o.ClampScale();
             host.EndCheckpointBurst();
             host.Doc.Insert(0, o); // behind stamps and text
-            return true;
         }
 
         /// <summary>看板に合わせる: places the selected picture again with the current 置き方.</summary>

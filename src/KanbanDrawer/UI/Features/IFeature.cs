@@ -1,4 +1,5 @@
 using System.Windows.Forms;
+using KanbanDrawer.Core;
 using KanbanDrawer.Core.Board;
 
 namespace KanbanDrawer.UI.Features
@@ -29,5 +30,18 @@ namespace KanbanDrawer.UI.Features
     internal interface IAcceptsFiles
     {
         bool OpenFile(string path);
+    }
+
+    /// <summary>
+    /// A feature that takes pasted clipboard contents (MainForm tries the active tab first, then the registration order).
+    /// A kind it does not take returns false.
+    /// </summary>
+    internal interface IAcceptsPaste
+    {
+        /// <summary>Picture data (ARGB, alpha kept) and its name.</summary>
+        bool PasteImage(Raster image, string name);
+
+        /// <summary>Non-empty text without leading / trailing blanks and blank lines.</summary>
+        bool PasteText(string text);
     }
 }

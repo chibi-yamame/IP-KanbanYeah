@@ -39,6 +39,7 @@ namespace KanbanDrawer.UI
         readonly Button undo = new Button { Text = "元に戻す", AutoSize = true };
         readonly Button redo = new Button { Text = "やり直し", AutoSize = true };
         readonly Button savePng = new Button { Text = "PNG 保存", AutoSize = true };
+        readonly Button paste = new Button { Text = "貼り付け", AutoSize = true };
         readonly Label stats = new Label { Height = 50, AutoEllipsis = true };
         readonly ComboBox inputMode = Ui.DropDown(Modes.Select(m => m.Name).ToArray());
         readonly Button detect = new Button { Text = "看板を検出", AutoSize = true };
@@ -92,6 +93,7 @@ namespace KanbanDrawer.UI
             undo.Click += (s, e) => Undo();
             redo.Click += (s, e) => Redo();
             savePng.Click += (s, e) => SavePng();
+            paste.Click += (s, e) => Paste();
             inputMode.SelectedIndexChanged += (s, e) => UpdateStats();
             detect.Click += (s, e) => Detect();
             draw.Click += (s, e) => StartDrawing(false);
@@ -117,7 +119,7 @@ namespace KanbanDrawer.UI
             view.Margin = new Padding(0);
             left.Controls.Add(view);
             left.Controls.Add(Ui.Buttons(makeDraft, colorView, draftView));
-            left.Controls.Add(Ui.Buttons(undo, redo, savePng));
+            left.Controls.Add(Ui.Buttons(undo, redo, savePng, paste));
             left.Controls.Add(stats);
             // input mode and 看板を検出 share a row
             var modeRow = new TableLayoutPanel { Height = 28, ColumnCount = 3, Margin = new Padding(0, 2, 0, 2) };
@@ -171,6 +173,34 @@ namespace KanbanDrawer.UI
             if (target == null) return;
             if (target != active) tabs.SelectedTab = pages[(IFeature)target];
             target.OpenFile(path);
+        }
+
+        /// <summary>
+        /// 貼り付け (Ctrl+V / button): the clipboard is read now. Picture files open like a drop (one undo each);
+        /// picture data / text go to the first feature that takes them, the active tab first.
+        /// </summary>
+        void Paste()
+        {
+            if (drawing != null) return;
+            ClipboardContent c;
+            try { c = ClipboardContent.Read(Clipboard.GetDataObject()); }
+            catch (Exception) { c = ClipboardContent.None; } // e.g. held by another application
+            switch (c.Kind)
+            {
+                case ClipboardContent.ContentKind.Files:
+                    foreach (var f in c.Files) OpenFile(f);
+                    break;
+                case ClipboardContent.ContentKind.Image:
+                case ClipboardContent.ContentKind.Text:
+                    var active = features.FirstOrDefault(f => pages[f] == tabs.SelectedTab);
+                    var order = new[] { active }.Concat(features).Where(f => f != null).Distinct().OfType<IAcceptsPaste>();
+                    foreach (var p in order)
+                        if (c.Kind == ClipboardContent.ContentKind.Image ? p.PasteImage(c.Image, "クリップボード") : p.PasteText(c.Text)) break;
+                    break;
+                default:
+                    Log("貼り付けられるものがありません");
+                    break;
+            }
         }
 
         void Undo()
@@ -228,6 +258,7 @@ namespace KanbanDrawer.UI
             if (typing || !e.Control) return;
             if (e.KeyCode == Keys.Z && !e.Shift) { Undo(); e.Handled = true; }
             else if (e.KeyCode == Keys.Y || (e.KeyCode == Keys.Z && e.Shift)) { Redo(); e.Handled = true; }
+            else if (e.KeyCode == Keys.V && !e.Shift && !e.Alt) { Paste(); e.Handled = true; }
         }
 
         // ---------- stats / settings ----------
@@ -366,6 +397,7 @@ namespace KanbanDrawer.UI
             draw.Enabled = resume.Enabled = makeDraft.Enabled = !busy;
             stop.Enabled = busy;
             detect.Enabled = !busy;
+            paste.Enabled = !busy;
             tabs.Enabled = !busy;
             view.Enabled = !busy;
             UpdateUndo();
