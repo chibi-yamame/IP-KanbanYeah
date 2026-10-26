@@ -27,7 +27,7 @@
     <EmbeddedResource Include="Resources/kanban-text.jar" LogicalName="KanbanDrawer.kanban-text.jar" />
   </ItemGroup>
 
-  <!-- the window / taskbar icon (the same file is the exe's icon); vector source app.svg, both made by the development tools -->
+  <!-- the window / taskbar icon (the same file is the exe's icon); app.ico is rendered from the vector source app.svg -->
   <ItemGroup>
     <EmbeddedResource Include="app.ico" LogicalName="KanbanDrawer.app.ico" />
   </ItemGroup>
