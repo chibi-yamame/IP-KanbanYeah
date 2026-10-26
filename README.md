@@ -8,6 +8,8 @@ Windows 版 InterPot3 の看板エディタに、好きな絵を自動で描く�
 - 画像・スタンプ・文字・フレームを組み合わせて看板を作り、看板の 10 色・1px ペンで描きます。描いたあとの「保存」はご自身で押してください。
 - 描画中もマウスは自由に使えます（既定の「バックグラウンド」方式）。
 
+<img width="739" height="632" alt="image" src="https://github.com/user-attachments/assets/ecddf8af-3b83-4c60-9cef-a6f9f40eae34" />
+
 ## 入手
 [Releases](https://github.com/chibi-yamame/IP-KanbanYeah/releases) から `KanbanYeah-<版>.zip` をダウンロードして展開します。
 署名のない exe なので、初回に Windows の「PC を保護しました」が出たら「詳細情報」→「実行」で起動できます。
