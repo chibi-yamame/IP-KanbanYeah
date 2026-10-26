@@ -123,6 +123,37 @@ namespace KanbanDrawer.Tests
             Assert.Equal("p.png", back.FileName);
         }
 
+        /// <summary>A stamp on a selected full-board picture can be clicked (the picture's body does not take the click).</summary>
+        [Fact]
+        public void ClickPicksTheStampInFrontOfTheSelectedPicture()
+        {
+            var doc = new BoardDoc();
+            var stamp = new StampObject("s", Solid(20, 20, Red)) { Cx = 100, Cy = 100 };
+            doc.Add(stamp);
+            var pic = new PictureObject("p.png", Solid(320, 240, unchecked((int)0xFF0205CA))) { Cx = 160, Cy = 120 };
+            doc.Insert(0, pic); // selected, behind the stamp
+
+            Assert.Equal(Handle.Body, Handles.Pick(doc, 100, 100, out var target));
+            Assert.Same(stamp, target);
+            Assert.Equal(Handle.Body, Handles.Pick(doc, 10, 10, out target)); // elsewhere: the selected picture
+            Assert.Same(pic, target);
+
+            // the selection's handles still come first, even over an object in front
+            doc.Select(stamp);
+            var corner = Handles.Points(stamp);
+            Assert.Equal(Handle.ScaleTL, Handles.Pick(doc, corner[0], corner[1], out target));
+            Assert.Same(stamp, target);
+            // an object behind the selected one does not take the selected one's body
+            stamp.Scale = 3;
+            Assert.Equal(Handle.Body, Handles.Pick(doc, 110, 110, out target));
+            Assert.Same(stamp, target);
+            // nothing there
+            doc.Objects.Clear();
+            doc.Select(null);
+            Assert.Equal(Handle.None, Handles.Pick(doc, 10, 10, out target));
+            Assert.Null(target);
+        }
+
         [Fact]
         public void TransparentPartsAreNotPicked()
         {

@@ -64,12 +64,8 @@ namespace KanbanDrawer.UI
             if (e.Button != MouseButtons.Left) return;
             var p = Page(e.Location);
             var doc = host.Doc;
-            var handle = Handles.Hit(doc.Selected, p.X, p.Y);
-            if (handle == Part.None)
-            {
-                doc.Select(doc.HitTest(p.X, p.Y));
-                handle = doc.Selected != null ? Part.Body : Part.None;
-            }
+            var handle = Handles.Pick(doc, p.X, p.Y, out var target);
+            doc.Select(target);
             if (handle != Part.None)
             {
                 drag = new Drag(doc.Selected, handle, p.X, p.Y);
@@ -83,10 +79,10 @@ namespace KanbanDrawer.UI
             var p = Page(e.Location);
             if (drag == null)
             {
-                var h = Handles.Hit(host.Doc.Selected, p.X, p.Y);
-                Cursor = h == Part.Body ? Cursors.SizeAll
+                var h = Handles.Pick(host.Doc, p.X, p.Y, out var target);
+                Cursor = h == Part.Body ? (target == host.Doc.Selected ? Cursors.SizeAll : Cursors.Hand)
                     : h == Part.Rotate ? Cursors.Hand
-                    : h == Part.None ? (host.Doc.HitTest(p.X, p.Y) != null ? Cursors.Hand : Cursors.Default)
+                    : h == Part.None ? Cursors.Default
                     : (h == Part.ScaleTL || h == Part.ScaleBR) ? Cursors.SizeNWSE : Cursors.SizeNESW;
                 return;
             }

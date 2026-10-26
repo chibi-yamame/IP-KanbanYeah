@@ -47,6 +47,28 @@ namespace KanbanDrawer.Core.Board
             return o.InsideBox(x, y, 1) ? Handle.Body : Handle.None;
         }
 
+        /// <summary>
+        /// What a click at the page point grabs: the selection's scale / rotate handles first; then an object in front of
+        /// the selection that is hit (a stamp on a selected full-board picture); then the selection's body; then the
+        /// topmost object hit. Returns <see cref="Handle.None"/> and null when nothing is there.
+        /// </summary>
+        public static Handle Pick(BoardDoc doc, double x, double y, out BoardObject target)
+        {
+            var sel = doc.Selected;
+            var h = Hit(sel, x, y);
+            target = sel;
+            if (h != Handle.None && h != Handle.Body) return h;
+            var top = doc.HitTest(x, y);
+            if (top != null && top != sel && (h == Handle.None || doc.Objects.IndexOf(top) > doc.Objects.IndexOf(sel)))
+            {
+                target = top;
+                return Handle.Body;
+            }
+            if (h == Handle.Body) return h;
+            target = null;
+            return Handle.None;
+        }
+
         static double Dist(double x0, double y0, double x1, double y1) => Math.Sqrt((x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0));
     }
 
