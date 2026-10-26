@@ -100,7 +100,7 @@ Ctrl+V・「貼り付け」ボタン（[ui.md](ui.md)）で、クリップボー
   1. `FileDrop`（エクスプローラーでコピーしたファイル）: 拡張子が画像（png / jpg / jpeg / bmp / gif、「画像」タブの開くダイアログと同じ）で
      実在するものを順に `Files` へ。1 つもなければこの段階は無かったものとして次へ。
   2. `PNG` 形式（`MemoryStream`。アルファを保つ。ブラウザ・Office・画像編集ソフトが入れる）→ なければ `Bitmap`（`DataFormats.Bitmap`、
-    DIB を含む。不透明）。どちらも `ImageLoader.ToRaster` で `Raster`（ARGB）にして `Image` へ。    読めない・壊れている形式は無かったものとして次へ。
+    DIB を含む。不透明）。どちらも `ImageLoader.ToRaster` で `Raster`（ARGB）にして `Image` へ。読めない・壊れている形式は無かったものとして次へ。
   3. `UnicodeText`（`DataFormats.UnicodeText`）: 前後の空白・空行（`Trim()`、改行を含む）を除いて、空でなければ `Text` へ。途中の
      改行・空行はそのまま（複数行の文字になる）。長さは切らない。
   - 画像とテキストが両方あるとき（ブラウザ・Office のコピー）は画像を優先する。どれも無ければ `None`。
@@ -164,7 +164,7 @@ Ctrl+V・「貼り付け」ボタン（[ui.md](ui.md)）で、クリップボー
 - 背景除去と切り詰め、320×240 の判定: `StampPrepTests`。ライブラリ（壊れた行を無視）: `LibraryTests`
 - GDI+ の文字が 2 値・縁取りあり・測った箱の中、再描画速度: `GdiTextTests`
 - 公式文字: Java の描画と全サイズで画素一致、近似でも日本語は一致、回転・拡縮しない・整数座標、縁取り: `OfficialTextTests`
-- 貼り付け（`ClipboardContent.Read` を `DataObject` で）: 形式の優先順位（ファイル > PNG > Bitmap > テキスト、画像とテキストが両方なら画像、画像でないファイルは飛ばして次へ）、PNG のアルファが残る（Bitmap は不透明）、テキストの前後の空白・空行除去（途中の改行は残す）、空・空白だけ・何も無いなら `None`（何も置かない）。画像・文字の追加は `PictureTests` / 既存の処理: `PasteTests`
+- 貼り付け（`ClipboardContent.Read` を `DataObject` で）: 形式の優先順位（ファイル > PNG > Bitmap > テキスト、画像とテキストが両方なら画像、画像でないファイルは飛ばして次へ）、PNG のアルファが残る（Bitmap は不透明）、テキストの前後の空白・空行除去（途中の改行は残す）、空・空白だけ・何も無いなら `None`（何も置かない）: `PasteTests`。画像・文字の追加そのものは既存の処理（`PictureTests` など）
 - 画面込みの通し: `tools/gui-e2e.sh`（開発環境のテスト）
 
 ## 落とし穴
