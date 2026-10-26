@@ -9,8 +9,10 @@ using KanbanDrawer.Win;
 namespace KanbanDrawer.UI.Features
 {
     /// <summary>
-    /// 下地: the bottom layer. A plain palette colour, or a registered frame: a picture converted to 320x240 palette
-    /// colours when it is registered (with the 減色 settings of that moment) and kept in the frame library.
+    /// 下地: the bottom layer. A background palette colour and, chosen separately, an optional registered frame: a
+    /// picture converted to 320x240 palette colours when it is registered (with the 減色 settings of that moment,
+    /// transparency kept) and kept in the frame library. The background colour shows through the frame's transparent
+    /// pixels and the picture's margins.
     /// </summary>
     internal sealed class FrameFeature : IFeature
     {
@@ -29,14 +31,14 @@ namespace KanbanDrawer.UI.Features
         {
             host = h;
             var p = new StackPanel();
-            p.Controls.Add(Ui.Heading("無地の色"));
+            p.Controls.Add(Ui.Heading("背景色"));
             p.Controls.Add(Ui.Row("色", color));
-            p.Controls.Add(Ui.Note("フレームがないとき、画像の余白・透明部分の色です。", 18));
+            p.Controls.Add(Ui.Note("フレームの透明部分・画像の余白には背景色が見えます。", 18));
             p.Controls.Add(Ui.Heading("フレーム"));
             p.Controls.Add(list);
             p.Controls.Add(Ui.Buttons(Ui.Button("フレームを登録...", Register)));
             p.Controls.Add(Ui.Row("合わせ方", fit));
-            p.Controls.Add(Ui.Note("登録時に 320×240 にして、今の「減色」の設定で 10 色にして保存します。\n右クリックで削除できます。", 34));
+            p.Controls.Add(Ui.Note("登録時に 320×240 にして、今の「減色」の設定で 10 色にして保存します。透明な部分（「全体を収める」の余白も）は透明のまま残ります。\n右クリックで削除できます。", 50));
             color.SelectedChanged += (s, e) =>
             {
                 host.EndCheckpointBurst();
@@ -121,9 +123,7 @@ namespace KanbanDrawer.UI.Features
             {
                 Raster placed;
                 using (var bmp = ImageLoader.Load(path)) placed = ImageLoader.Fit(bmp, FitModes[fit.SelectedIndex]);
-                var opt = host.Quantize.Clone();
-                opt.Background = Palette.All[host.Doc.BackgroundColor].Rgb;
-                var indexed = Quantizer.Quantize(placed, opt);
+                var indexed = Quantizer.QuantizeFrame(placed, host.Quantize);
                 string id = host.Frames.Add(indexed.ToRaster());
                 folder = System.IO.Path.GetDirectoryName(path);
                 host.Log($"フレームを登録しました: {System.IO.Path.GetFileName(path)}");
