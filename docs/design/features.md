@@ -115,7 +115,7 @@ Ctrl+V・「貼り付け」ボタン（[ui.md](ui.md)）で、クリップボー
     `Owns` の仕組み（`OnSelectionChanged`）でそのタブに切り替わる。
   - `None`: 何もせず、ログ「貼り付けられるものがありません」。
 - **画像**（`PictureFeature.PasteImage`）: 「画像」タブで開いたときと同じ処理（`OpenFile` の読み込み以降を共通のメソッドにして使う）:
-  長辺 1280px に縮小（`PictureObject.Shrink`）、今の「置き方」で配置、`Doc.Insert(0, …)` で最背面に入れて選択。名前（`PictureObject.Name`）は
+  長辺 1280px に縮小（`PictureObject.Shrink`）、今の「置き方」で配置、`Doc.Insert(0, …)` で最背面に入れて選択。名前（`PictureObject.FileName`）は
   「クリップボード」。ログは「画像: クリップボード (幅×高さ)」（縮小したときは `OpenFile` と同じ書式）。アルファは保たれる（透明部分は下が見える）。
   読み込み元フォルダ（`picture.folder`）は変えない。
 - **文字**（`TextFeature.PasteText`）: 「文字を追加」と同じ — 今の 文字の形（公式 / フォント）・フォント・サイズ・太字・色・縁取り・縁の幅・
