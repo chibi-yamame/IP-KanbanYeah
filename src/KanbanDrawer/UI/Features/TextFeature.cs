@@ -13,7 +13,7 @@ namespace KanbanDrawer.UI.Features
     /// 文字: text objects in palette colours only, drawn without anti-aliasing (crisp at 1 px), any installed font.
     /// With a text selected the controls edit it; otherwise they set up the next 文字を追加.
     /// </summary>
-    internal sealed class TextFeature : IFeature
+    internal sealed class TextFeature : IFeature, IAcceptsPaste
     {
         EditorHost host;
         readonly TextBox text = new TextBox { Multiline = true, Height = 54, ScrollBars = ScrollBars.Vertical, AcceptsReturn = true };
@@ -206,6 +206,21 @@ namespace KanbanDrawer.UI.Features
             };
             t.Measure(host.Text);
             host.AddObject(t);
+        }
+
+        public bool PasteImage(Raster image, string name) => false;
+
+        /// <summary>Pasted text: 文字を追加 with the current settings and the pasted text (the 文字 box shows it too).</summary>
+        public bool PasteText(string pasted)
+        {
+            var s = pasted?.Trim();
+            if (string.IsNullOrEmpty(s)) return false;
+            // the box is set without editing the selected text; adding selects the new one and Show brings the controls in line
+            showing = true;
+            try { text.Text = s.Replace("\r\n", "\n").Replace('\r', '\n').Replace("\n", "\r\n"); } // a multiline box shows only CRLF as a break
+            finally { showing = false; }
+            Add();
+            return true;
         }
 
         /// <summary>Shows a text's values in the controls (without editing it back).</summary>
