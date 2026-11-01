@@ -27,9 +27,9 @@
 |---|---|
 | `Java/KanbanAgent.java` → `Resources/kanban-agent.jar` | エージェント（Java 8 バイトコード、`javac --release 8`）。マニフェスト `Java/kanban-agent.mf` は `Premain-Class: KanbanAgent`。exe に内蔵（csproj の EmbeddedResource、論理名 `KanbanDrawer.kanban-agent.jar`）。jar はコミットする（公式文字の `kanban-text.jar` と同じ） |
 | `Win/AgentLink` | パイプのサーバー（接続の待ち受け・再待ち受け・ACL）+ 手順の本体 `AgentSession`（`Stream` 1 本を相手に HELLO を読み、PUT を送って応答を読む。テストはメモリ上のストリームで行う）。`Status` と `StatusChanged` イベント（任意のスレッドから） |
-| `Win/GameLauncher` | `InterPot3.jar` の場所の検出（`FindInstalled`）・確認（`ChooseGame`）・表示用の短い形（`ShortPath`）、起動、ショートカット（.lnk）作成。`JavaHelper` を使う |
+| `Win/GameLauncher` | `InterPot3.jar` の場所の決定（`LocateGame`、自動検出 `FindInstalled`）、起動、ショートカット（.lnk）作成。`JavaHelper` を使う |
 | `Win/JavaHelper` | 既存。`FindJava`（.jar を開く Java）、`Extract`（`%LOCALAPPDATA%\KanbanDrawer` へ書き出し）。`FindJavaw`（同じ場所の `javaw.exe`、無ければ `FindJava` と同じ）を足す |
-| `UI/MainForm` | 入力方式「フルカラー」、状態の行・InterPot3.jar の行・ボタン、`StartFullColor`（[ui.md](ui.md)） |
+| `UI/MainForm` | 入力方式「フルカラー」、状態の行・ボタン、`StartFullColor`（[ui.md](ui.md)） |
 
 `AgentLink` は Win32 の API は使わず `System.IO.Pipes`（.NET Framework 4.8 標準）だけ。純粋な手順（`AgentSession`、RGB への変換）は
 `Win/` に置くが WinForms に依存しない。
@@ -76,21 +76,18 @@ AWT のイベントスレッド以外から木を辿ってよい（読むだけ�
 
 ## ゲームの起動とショートカット（`GameLauncher`）
 ### `InterPot3.jar` の場所
-決め打ちで黙って使わない。**利用者が確認した場所だけ**を設定 `fullcolor.jar`（[ui.md](ui.md)）に保存して使う。
-- **使うとき**（`GameLauncher.LocateGame(configured, owner)`。「InterPot を起動」「ショートカットを作成」）: `fullcolor.jar` が空でなくファイルが
-  存在すればそれを使う。空・存在しなければ **初回の確認** = `ChooseGame(candidate, owner)` のファイル選択（`OpenFileDialog`、題「InterPot3.jar を選んでください」、
-  フィルター `InterPot3.jar|InterPot3.jar|jar|*.jar`）を出す。`candidate` = `FindInstalled()` の結果（無ければ選択なし、場所は既定のフォルダ）を、
-  フォルダ（`InitialDirectory`）とファイル名（`FileName`）に入れて選んだ状態にする。確定したファイル（存在するものだけ）を返し、呼び出し側が
-  `fullcolor.jar` に保存してラベルを更新する。キャンセルは null（保存しない、何もしない）。
-- **自動の候補**（`GameLauncher.FindInstalled()`、**読むだけ**）: ①アンインストール情報 — `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*`
-  を 64bit と 32bit（`WOW6432Node`）の両方のビュー（`RegistryKey.OpenBaseKey(LocalMachine, view)`、`OpenSubKey(name, false)`）で順に見て、
-  `DisplayName` が `InterPot3`（大文字小文字は区別しない）の項目の `InstallLocation`（前後の引用符・末尾の `\` を除く）+ `\InterPot3.jar` で、
-  ファイルが存在する最初のもの。②既定 `C:\Program Files (x86)\InterPot3\InterPot3.jar`（存在すれば）。どちらもなければ null。
-  レジストリの例外・見つからない・読めない値は黙って無視（書き込み・キーの作成はしない）。項目の選び方は純粋なメソッド
-  （`PickInstallLocation(IEnumerable<(string DisplayName, string InstallLocation)>, Func<string, bool> exists)`）に分けて単体テストする。
-- **「変更...」**（状態の行の下の行）: `ChooseGame(今の fullcolor.jar（存在すれば）?? FindInstalled(), owner)`。確定したら保存して表示を更新。
-- **表示**（`GameLauncher.ShortPath(path)`、純粋）: 親フォルダ名 + ファイル名（`InterPot3\InterPot3.jar`）。さらに上の階層があれば先頭に `…\`
-  （`…\InterPot3\InterPot3.jar`）、ドライブ直下は `C:\InterPot3.jar`。空は「未設定」。フルパスはツールチップ。
+`GameLauncher.LocateGame(configured, owner)`（「InterPot を起動」「ショートカットを作成」）が次の順で決める。存在するファイルだけが対象:
+1. 設定 `fullcolor.jar`（[ui.md](ui.md)）。
+2. **自動で見つけた場所**（`GameLauncher.FindInstalled()`、黙って使う。レジストリは**読むだけ**）: ①アンインストール情報 —
+   `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*` を 64bit と 32bit（`WOW6432Node`）の両方のビュー
+   （`RegistryKey.OpenBaseKey(LocalMachine, view)`、`OpenSubKey(name, false)`）で順に見て、`DisplayName` が `InterPot3`（大文字小文字は区別しない）の項目の
+   `InstallLocation`（前後の引用符・末尾の `\` を除く）+ `\InterPot3.jar` で、ファイルが存在する最初のもの。②既定
+   `C:\Program Files (x86)\InterPot3\InterPot3.jar`。レジストリの例外・見つからない・読めない値は黙って無視（書き込み・キーの作成はしない）。
+   項目の選び方は純粋なメソッド `PickInstallLocation(IEnumerable<(string DisplayName, string InstallLocation)>, Func<string, bool> exists)` に分けて単体テストする。
+   見つかった場所は設定に保存しない（毎回探す。インストール先が変わっても追従する）。
+3. どれもなければファイル選択（`OpenFileDialog`、題「InterPot3.jar を選んでください」、フィルター `InterPot3.jar|InterPot3.jar|jar|*.jar`）。
+   選んだ場所（存在するもの）を `fullcolor.jar` に保存する。キャンセルなら null（ログ「InterPot3.jar が見つかりません」で終わり）。
+場所の表示や変更用の画面はない（変えたいときは `settings.txt` の `fullcolor.jar` を直す）。
 
 ### 起動（「InterPot を起動」）
 1. Java: `JavaHelper.FindJavaw()`（.jar を開く Java の `javaw.exe`。無ければ `java.exe`）。無ければログ「InterPot を動かす Java（.jar を開くプログラム）が見つかりません」で終わり。
@@ -98,7 +95,7 @@ AWT のイベントスレッド以外から木を辿ってよい（読むだけ�
 3. `Process.Start`（`UseShellExecute = false`、作業フォルダ = `InterPot3.jar` のフォルダ、引数 `-javaagent:"<agent jar>" -jar "<InterPot3.jar>"`）。
    `JavaHelper.Start` のジョブオブジェクトには**入れない**（看板屋を閉じてもゲームは続ける）。標準出力・入力は取らない。
 4. ログ「InterPot を起動しました（フルカラー用）。ログインして看板の編集画面を開くと、状態が「接続中: エディタあり」になります」。
-`InterPot3.jar` の場所は上の「InterPot3.jar の場所」で決める（初回は確認のファイル選択。キャンセルならログ「InterPot3.jar が見つかりません」で終わり）。
+`InterPot3.jar` の場所は上の「InterPot3.jar の場所」で決める。
 既にゲームが動いていても起動する（二重起動の判定はしない。ゲーム自身の仕組みに任せる）。
 
 ### ショートカット（「ショートカットを作成」）
@@ -221,7 +218,7 @@ AWT のイベントスレッド以外から木を辿ってよい（読むだけ�
   - 合成 → RGB 変換（四捨五入、並び、固定画素もそのまま、なめらかな文字の中間色もそのまま）
   - 実際の名前付きパイプ（テスト用の名前を `KANBANDRAWER_PIPE` 相当の引数で渡す）に別スレッドのクライアントでつなぎ、HELLO → PUT → OK の往復と、
     2 つ目のサーバーが作れない（`Busy`）こと
-- `GameLauncherTests`（CI で実行）: `ShortPath`（通常 / さらに上の階層 / ドライブ直下 / 空）、`PickInstallLocation`（DisplayName の完全一致・大文字小文字・引用符と末尾 `\` の除去・存在しないものを飛ばす・該当なしは null）、ショートカット名 `InterPot3 (屋).lnk`
+- `GameLauncherTests`（CI で実行）: `PickInstallLocation`（DisplayName の完全一致・大文字小文字・引用符と末尾 `\` の除去・存在しないものを飛ばす・該当なしは null）、ショートカット名 `InterPot3 (屋).lnk`
 - E2E（開発環境側で管理）: エージェント付きでモック看板（本物の `EditCanvas`）を起動 → 看板屋で書き込み → 看板の内部の `pixels` と目標が
   0 画素差、`undoBuf` に元の画素があること、エディタなし（`none`）のときの `ERR`、Ctrl+Shift+V でクリップボードの画像が収まること。
 - Java のエージェントには単体テストを置かない（CI に Java を入れない。E2E で確認）。
