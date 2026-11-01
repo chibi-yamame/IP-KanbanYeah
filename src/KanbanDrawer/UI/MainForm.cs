@@ -465,6 +465,7 @@ namespace KanbanDrawer.UI
         void OnInputMode()
         {
             bool full = FullColor;
+            host.FullColor = full; // smooth text while writing in full colour
             if (agentRow.Visible != full)
             {
                 agentRow.Visible = full; // hidden = takes no height

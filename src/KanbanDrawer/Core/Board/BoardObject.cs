@@ -6,6 +6,11 @@ namespace KanbanDrawer.Core.Board
     public interface IRenderServices
     {
         ITextRasterizer Text { get; }
+        /// <summary>
+        /// true = draw text smoothly (anti-aliased, free pixels) — set while the input mode is full colour. Official text
+        /// stays 2-value regardless.
+        /// </summary>
+        bool Smooth { get; }
     }
 
     /// <summary>
