@@ -106,14 +106,17 @@ namespace KanbanDrawer.Win
             }
         }
 
-        /// <summary>The first .ico in the game's folder, else its first .exe, else the Java.</summary>
+        /// <summary>
+        /// The game's own icon: interpot3.ico in its folder (what the installer's shortcuts use), else the first .ico there,
+        /// else the Java. Not an .exe: the folder's only one is the uninstaller.
+        /// </summary>
         static string IconFor(string dir, string java)
         {
             try
             {
-                return Directory.GetFiles(dir, "*.ico").OrderBy(f => f, StringComparer.OrdinalIgnoreCase).FirstOrDefault()
-                       ?? Directory.GetFiles(dir, "*.exe").OrderBy(f => f, StringComparer.OrdinalIgnoreCase).FirstOrDefault()
-                       ?? java;
+                string own = Path.Combine(dir, "interpot3.ico");
+                if (File.Exists(own)) return own;
+                return Directory.GetFiles(dir, "*.ico").OrderBy(f => f, StringComparer.OrdinalIgnoreCase).FirstOrDefault() ?? java;
             }
             catch (Exception) { return java; }
         }

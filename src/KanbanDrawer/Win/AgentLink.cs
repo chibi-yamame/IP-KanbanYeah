@@ -366,14 +366,21 @@ namespace KanbanDrawer.Win
         bool WaitForConnection(NamedPipeServerStream pipe)
         {
             var ar = pipe.BeginWaitForConnection(null, null);
-            if (WaitHandle.WaitAny(new[] { ar.AsyncWaitHandle, stop }) == 1)
+            try
             {
-                try { pipe.Dispose(); } catch (Exception) { }
-                try { pipe.EndWaitForConnection(ar); } catch (Exception) { }
-                return false;
+                if (WaitHandle.WaitAny(new[] { ar.AsyncWaitHandle, stop }) == 1)
+                {
+                    try { pipe.Dispose(); } catch (Exception) { }
+                    try { pipe.EndWaitForConnection(ar); } catch (Exception) { }
+                    return false;
+                }
+                pipe.EndWaitForConnection(ar);
+                return true;
             }
-            pipe.EndWaitForConnection(ar);
-            return true;
+            finally
+            {
+                ar.AsyncWaitHandle.Close(); // one event per wait: not left to the finalizer
+            }
         }
 
         /// <summary>
