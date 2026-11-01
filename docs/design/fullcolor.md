@@ -27,7 +27,7 @@
 |---|---|
 | `Java/KanbanAgent.java` → `Resources/kanban-agent.jar` | エージェント（Java 8 バイトコード、`javac --release 8`）。マニフェスト `Java/kanban-agent.mf` は `Premain-Class: KanbanAgent`。exe に内蔵（csproj の EmbeddedResource、論理名 `KanbanDrawer.kanban-agent.jar`）。jar はコミットする（公式文字の `kanban-text.jar` と同じ） |
 | `Win/AgentLink` | パイプのサーバー（接続の待ち受け・再待ち受け・ACL）+ 手順の本体 `AgentSession`（`Stream` 1 本を相手に HELLO を読み、PUT を送って応答を読む。テストはメモリ上のストリームで行う）。`Status` と `StatusChanged` イベント（任意のスレッドから） |
-| `Win/GameLauncher` | `InterPot3.jar` の場所の決定、起動、ショートカット（.lnk）作成。`JavaHelper` を使う |
+| `Win/GameLauncher` | `InterPot3.jar` の場所の決定（`LocateGame`、自動検出 `FindInstalled`）、起動、ショートカット（.lnk）作成。`JavaHelper` を使う |
 | `Win/JavaHelper` | 既存。`FindJava`（.jar を開く Java）、`Extract`（`%LOCALAPPDATA%\KanbanDrawer` へ書き出し）。`FindJavaw`（同じ場所の `javaw.exe`、無ければ `FindJava` と同じ）を足す |
 | `UI/MainForm` | 入力方式「フルカラー」、状態の行・ボタン、`StartFullColor`（[ui.md](ui.md)） |
 
@@ -76,8 +76,18 @@ AWT のイベントスレッド以外から木を辿ってよい（読むだけ�
 
 ## ゲームの起動とショートカット（`GameLauncher`）
 ### `InterPot3.jar` の場所
-設定 `fullcolor.jar`（[ui.md](ui.md)）→ 無ければ `C:\Program Files (x86)\InterPot3\InterPot3.jar` → それも無ければファイル選択（`OpenFileDialog`、
-`InterPot3.jar` を選ばせる）。選んだ場所を `fullcolor.jar` に保存する。ファイルが存在しなければ使わない。
+`GameLauncher.LocateGame(configured, owner)`（「InterPot を起動」「ショートカットを作成」）が次の順で決める。存在するファイルだけが対象:
+1. 設定 `fullcolor.jar`（[ui.md](ui.md)）。
+2. **自動で見つけた場所**（`GameLauncher.FindInstalled()`、黙って使う。レジストリは**読むだけ**）: ①アンインストール情報 —
+   `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*` を 64bit と 32bit（`WOW6432Node`）の両方のビュー
+   （`RegistryKey.OpenBaseKey(LocalMachine, view)`、`OpenSubKey(name, false)`）で順に見て、`DisplayName` が `InterPot3`（大文字小文字は区別しない）の項目の
+   `InstallLocation`（前後の引用符・末尾の `\` を除く）+ `\InterPot3.jar` で、ファイルが存在する最初のもの。②既定
+   `C:\Program Files (x86)\InterPot3\InterPot3.jar`。レジストリの例外・見つからない・読めない値は黙って無視（書き込み・キーの作成はしない）。
+   項目の選び方は純粋なメソッド `PickInstallLocation(IEnumerable<(string DisplayName, string InstallLocation)>, Func<string, bool> exists)` に分けて単体テストする。
+   見つかった場所は設定に保存しない（毎回探す。インストール先が変わっても追従する）。
+3. どれもなければファイル選択（`OpenFileDialog`、題「InterPot3.jar を選んでください」、フィルター `InterPot3.jar|InterPot3.jar|jar|*.jar`）。
+   選んだ場所（存在するもの）を `fullcolor.jar` に保存する。キャンセルなら null（ログ「InterPot3.jar が見つかりません」で終わり）。
+場所の表示や変更用の画面はない（変えたいときは `settings.txt` の `fullcolor.jar` を直す）。
 
 ### 起動（「InterPot を起動」）
 1. Java: `JavaHelper.FindJavaw()`（.jar を開く Java の `javaw.exe`。無ければ `java.exe`）。無ければログ「InterPot を動かす Java（.jar を開くプログラム）が見つかりません」で終わり。
@@ -85,10 +95,11 @@ AWT のイベントスレッド以外から木を辿ってよい（読むだけ�
 3. `Process.Start`（`UseShellExecute = false`、作業フォルダ = `InterPot3.jar` のフォルダ、引数 `-javaagent:"<agent jar>" -jar "<InterPot3.jar>"`）。
    `JavaHelper.Start` のジョブオブジェクトには**入れない**（看板屋を閉じてもゲームは続ける）。標準出力・入力は取らない。
 4. ログ「InterPot を起動しました（フルカラー用）。ログインして看板の編集画面を開くと、状態が「接続中: エディタあり」になります」。
+`InterPot3.jar` の場所は上の「InterPot3.jar の場所」で決める。
 既にゲームが動いていても起動する（二重起動の判定はしない。ゲーム自身の仕組みに任せる）。
 
 ### ショートカット（「ショートカットを作成」）
-デスクトップ（`Environment.SpecialFolder.DesktopDirectory`）に「InterPot3 (フルカラー).lnk」を作る（既にあれば上書き）。
+デスクトップ（`Environment.SpecialFolder.DesktopDirectory`）に「InterPot3 (屋).lnk」を作る（既にあれば上書き。`GameLauncher.ShortcutName`。前の試作版の「InterPot3 (フルカラー).lnk」は触らない）。
 作成は `WScript.Shell` の COM（`Type.GetTypeFromProgID`、遅延バインド。参照の追加なし）:
 | 項目 | 値 |
 |---|---|
@@ -96,7 +107,7 @@ AWT のイベントスレッド以外から木を辿ってよい（読むだけ�
 | 引数 | 起動と同じ `-javaagent:"<agent jar>" -jar "<InterPot3.jar>"` |
 | 作業フォルダ | `InterPot3.jar` のフォルダ |
 | アイコン | `InterPot3.jar` と同じフォルダの `interpot3.ico`（公式のショートカットと同じ）、無ければそのフォルダの最初の `.ico`、無ければ Java のもの（`.exe` は使わない。そのフォルダの `.exe` はアンインストーラー） |
-作成前にエージェントの jar も書き出す。ログ「ショートカットを作りました: <パス>」。看板屋を閉じていてもこのショートカットでゲームを起動すればエージェントは入る。
+作成前にエージェントの jar も書き出す。ログ「デスクトップにIP起動用リンク「InterPot3 (屋)」を生成しました」（パスは出さない）。失敗時は「ショートカットを作れませんでした: <メッセージ>」のまま。看板屋を閉じていてもこのショートカットでゲームを起動すればエージェントは入る。
 
 ## 名前付きパイプ
 - 名前: `\\.\pipe\KanbanYeah-<ユーザーの SID>`（例 `KanbanYeah-S-1-5-21-…-1001`）。環境変数 `KANBANDRAWER_PIPE`（`\\.\pipe\` の後ろの名前）があれば看板屋はそれを使う
@@ -167,7 +178,10 @@ AWT のイベントスレッド以外から木を辿ってよい（読むだけ�
 ## 看板屋側の書き込み（`MainForm.StartFullColor`）
 1. 状態が `Editor` でなければ、理由をログに出して終わり（[ui.md](ui.md) のログの表）。
 2. 下書きは使わない。今の合成（`BoardDoc` の `Compositor` の結果、`Composite`）の RGB をそのまま 230,400 バイトに直す
-   （float を四捨五入して 0〜255。背景色・文字の固定画素も同じ値。減色・ディザ・パレット丸めはしない）。
+   （float を四捨五入して 0〜255。背景色の固定画素も同じ値。減色・ディザ・パレット丸めはしない）。
+   **文字**: 入力方式がフルカラーのあいだは `EditorHost.FullColor` により、「フォントを選ぶ」の文字と縁取りがアンチエイリアスで合成されている
+   （自由な画素。端は下の絵と混ざった中間色、色は 10 色のまま）ので、そのまま送られてにじまない。「公式と同じ（ドット文字）」は 2 値のまま
+   （[features.md](features.md)「フルカラーモードの文字」）。
 3. `AgentLink.Put(rgb)`（バックグラウンドで。応答は最大 10 秒待つ）→ ログ。成功したら「フルカラーで書き込みました。看板を確認して、「保存」はご自身で押してください。」（[ui.md](ui.md) のログの表）。
 4. 書き込みはペンで描くのと違い、カウントダウン・看板の検出・前面化・Esc の監視はしない（実マウスもメッセージも使わない）。
 
@@ -181,7 +195,7 @@ AWT のイベントスレッド以外から木を辿ってよい（読むだけ�
 - エージェントは例外を握りつぶしてゲームの動作に影響させない。ゲームを閉じればエージェントも終わる（デーモンスレッド）。
 
 ## システムへの影響・リソース（利用者の要件）
-- **Windows のシステムに影響を与えない**: レジストリ・環境変数（`JAVA_TOOL_OPTIONS` などを含む）・ファイルの関連付け・ファイアウォールは触らない。
+- **Windows のシステムに影響を与えない**: レジストリは**読むだけ**（`InterPot3.jar` の場所の検出でアンインストール情報を読む。書き込み・キーの作成はしない）。環境変数（`JAVA_TOOL_OPTIONS` などを含む）・ファイルの関連付け・ファイアウォールは触らない。
   管理者権限は要らない。TCP のポートは開かない。書くファイルは `%LOCALAPPDATA%\KanbanDrawer\kanban-agent.jar` と、利用者が「ショートカットを作成」を
   押したときのデスクトップの .lnk だけ。ゲームのフォルダには何も書かない。エージェントもファイル・レジストリ・環境変数を書かない。
 - **起動のオプションは最低限**: ゲームの起動に足すのは `-javaagent:"<agent jar>"` だけ（描画方式などの JVM オプションは足さない）。エージェントは
@@ -201,9 +215,10 @@ AWT のイベントスレッド以外から木を辿ってよい（読むだけ�
   - HELLO の解釈（`editor` / `none`、変化の通知、版違い、不正な行 / 長すぎる行 / 5 秒来ない）
   - `Put` が `PUT 320 240\n` + ちょうど 230,400 バイトを書く（行の順・RGB の並び）、`OK` / `ERR none` / `ERR <理由>` / 応答なし（10 秒の代わりに短い値を注入）/ 切断の扱い
   - `editor` でない状態では `Put` が何も書かない、版違いでは何も書かない
-  - 合成 → RGB 変換（四捨五入、並び、固定画素もそのまま）
+  - 合成 → RGB 変換（四捨五入、並び、固定画素もそのまま、なめらかな文字の中間色もそのまま）
   - 実際の名前付きパイプ（テスト用の名前を `KANBANDRAWER_PIPE` 相当の引数で渡す）に別スレッドのクライアントでつなぎ、HELLO → PUT → OK の往復と、
     2 つ目のサーバーが作れない（`Busy`）こと
+- `GameLauncherTests`（CI で実行）: `PickInstallLocation`（DisplayName の完全一致・大文字小文字・引用符と末尾 `\` の除去・存在しないものを飛ばす・該当なしは null）、ショートカット名 `InterPot3 (屋).lnk`
 - E2E（開発環境側で管理）: エージェント付きでモック看板（本物の `EditCanvas`）を起動 → 看板屋で書き込み → 看板の内部の `pixels` と目標が
   0 画素差、`undoBuf` に元の画素があること、エディタなし（`none`）のときの `ERR`、Ctrl+Shift+V でクリップボードの画像が収まること。
 - Java のエージェントには単体テストを置かない（CI に Java を入れない。E2E で確認）。

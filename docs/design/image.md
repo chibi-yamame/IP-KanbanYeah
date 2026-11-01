@@ -5,7 +5,7 @@
 
 ## 入口
 - 画面: 画像・スタンプ・フレームはフルカラーのまま看板に合成し（`Compositor` → `Composite`、[features.md](features.md)）、
-  「下書き」のときに `Core/Quantizer.Quantize(Composite, QuantizeOptions)` でまとめて減色する（固定画素 = 背景色・文字はそのまま）。
+  「下書き」のときに `Core/Quantizer.Quantize(Composite, QuantizeOptions)` でまとめて減色する（固定画素 = 背景色・文字はそのまま。フルカラーモードの文字は自由な画素 → [features.md](features.md)「フルカラーモードの文字」）。
   画像の読み込みは `Win/ImageLoader.Load` → `ToRaster`（長辺 1280px 超は `PictureObject.Shrink`）、配置はオブジェクトの倍率。
 - `ImageLoader.Fit(bitmap, FitMode)`（320x240 への配置）を使うのは、フレームの登録と CLI（`--quantize` / `--draw`:
   `Fit` → `Quantizer.Quantize(raster, QuantizeOptions)`、透明は `--bg` の色）。

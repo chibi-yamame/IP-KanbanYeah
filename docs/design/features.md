@@ -8,12 +8,14 @@
 | 層 | 中身 | 色の扱い |
 |---|---|---|
 | 下地 | 背景色（パレット色）+ 登録フレーム（320x240、フルカラー ARGB、透明あり）。フレームは背景色の上に `Blend`（透明の画素は背景色、半透明は混ざる） | 背景色 = **固定**（パレット番号のまま）、フレーム = 自由 |
-| オブジェクト | 画像・スタンプ・文字を z 順に（後ろほど前面）。選択・移動・回転・拡縮。新しい画像は先頭（最背面）に入る | 画像・スタンプ = 自由、文字 = **固定** |
+| オブジェクト | 画像・スタンプ・文字を z 順に（後ろほど前面）。選択・移動・回転・拡縮。新しい画像は先頭（最背面）に入る | 画像・スタンプ = 自由、文字 = **固定**（入力方式がフルカラーのときの「フォントを選ぶ」の文字だけ**自由**〔下記〕） |
 
 - 「固定」画素は減色しない。ディザの誤差を受け取らず、渡しもしない → 背景色と文字がにじまない。
 - 自由な画素（画像・スタンプ、半透明の縁を含む）だけを明るさ等で調整して減色・ディザする。半透明の縁は下の色と混ぜてから減色。
 - 画像は独立した層ではなくオブジェクト。余白・透明部分は下にあるもの（他のオブジェクト、なければ下地）が見える。
-- 文字はアンチエイリアスなしで描く（1 画素単位でパレット色、縁取りもパレット色）。
+- 文字はアンチエイリアスなしで描く（1 画素単位でパレット色、縁取りもパレット色）。**例外**: 入力方式が「フルカラー（直接書き込み）」のあいだ（`EditorHost.FullColor`）は、
+  「フォントを選ぶ」の文字と縁取りをアンチエイリアスで描き、**自由な画素**として合成する（下の「フルカラーモードの文字」）。「公式と同じ（ドット文字）」は
+  ゲームの字形なので常に 2 値・固定。色は今まで通りパレットの 10 色（任意の色は選べない）。
 
 ## 入口・流れ（編集 = フルカラー、下書き = 10 色）
 - **編集中**: `Doc.Changed` → `EditorHost.Invalidate()`。再描画はメッセージループ 1 周に 1 回だけ（`BeginInvoke` でまとめる）。
@@ -35,8 +37,8 @@
 | `ImageObject`（基底） | 画像を表すオブジェクトの共通部分。画素（ARGB、複製間で共有）。縮小時は表示サイズに面積平均で縮めたコピー（サイズごとにキャッシュ）から 1 点の双線形補間で自由層に合成。透明部分はクリックで拾わない |
 | `StampObject` | `ImageObject` の派生。ライブラリ id を持つ。画素はライブラリから読む |
 | `PictureObject` | `ImageObject` の派生。元ファイル名を持つ（ライブラリには登録しない）。長辺 1280px 超は読み込み時に面積平均で縮める。置き方（収める / 埋める / 等倍、中央）で初期の倍率・位置を決め、新規は最背面に入れて選択 |
-| `TextObject` | 文字列・フォント名・サイズ(px)・太字・色・縁取り色（-1 = なし）/幅。寸法は `Measure(ITextRasterizer)`、描画は固定層 |
-| `ITextRasterizer` / `IRenderServices` | 文字のマスク化（Win: `GdiTextRasterizer`、テスト: `BlockText`） |
+| `TextObject` | 文字列・フォント名・サイズ(px)・太字・色・縁取り色（-1 = なし）/幅。寸法は `Measure(ITextRasterizer)`。描画は固定層（2 値）、`services.Smooth` のときだけ（公式文字を除く）カバレッジで自由層に `Blend` |
+| `ITextRasterizer` / `IRenderServices` | 文字のマスク化（Win: `GdiTextRasterizer`、テスト: `BlockText`）。`ITextRasterizer.Rasterize` = 2 値のマスク、`RasterizeCoverage` = アンチエイリアスのカバレッジ。`IRenderServices.Smooth` = 文字をなめらかに描くか（下の「フルカラーモードの文字」） |
 | `Composite` / `CompositeCache` | RGB(float) + 固定番号（-1 = 自由）。`SetFixed` / `Blend` / `Clone`。キャッシュは背景色・フレームが同じ間は基礎層を使い回す（背景色が変わると作り直す） |
 | `Handles` / `Drag` | 角 = 拡縮（中心基準）、上辺の上のつまみ = 回転（Shift で 15°、看板外に出るときは下辺側へ）、本体 = 移動 |
 | `StampPrep` | 登録前処理: 背景を消す（縁の主要色から塗りつぶし、許容差 40）、透明な余白の切り詰め（縮小はしない）。`FitsBoard` = 320×240 以内か。`Scale`（面積平均）は描画時の縮小用。参考プロジェクト `ipx.android.Stamp` の移植 |
@@ -46,7 +48,7 @@
 ### Win
 | クラス | 役割 |
 |---|---|
-| `GdiTextRasterizer` | `GraphicsPath.AddString` → 変換 → `SmoothingMode.None` で塗り（縁取りは `Widen`）→ 2 値マスク。フォントはインストール済み一覧（既定: Yu Gothic UI → メイリオ → …） |
+| `GdiTextRasterizer` | `GraphicsPath.AddString` → 変換 → `SmoothingMode.None` で塗り（縁取りは `Widen`）→ 2 値マスク（`Rasterize`）。`Smooth`（`IRenderServices`、設定可能、既定 false）と `RasterizeCoverage`（`SmoothingMode.AntiAlias` で塗ったカバレッジ）。フォントはインストール済み一覧（既定: Yu Gothic UI → メイリオ → …） |
 | `ImageLibrary` / `StampLibrary` / `FrameLibrary` | `AppPaths.DataDir\stamps|frames\<id>.png` + `index.txt`（1 行 1 id、壊れた行・無いファイル・パス文字を含む行は無視、.tmp 経由で保存）。どれも ARGB で読み書きする（`Load`。フレームも同じ。前の版の 10 色フレームもそのまま読める）。削除: `Delete(ids)` は削除の記録を返し、ファイルを `trash\` に移す（最後の 1 回分だけ保持、`index.txt` の対象外。画面の起動時に `EmptyTrash`、CLI では空にしない＝画面を開いたまま CLI で登録しても「元に戻す」が消えない）。`Restore(記録)` で元の順番に戻す（削除後に一覧が変わっていれば、残っている直前の項目の後ろ） |
 | `ClipboardContent` | `Read(IDataObject)`: ファイル > PNG（アルファ）> Bitmap > テキストの優先順位で 1 種類を返す（下の「クリップボードから貼り付け」） |
 | `AppPaths` | `%APPDATA%\KanbanDrawer`、または環境変数 `KANBANDRAWER_DATA`（テスト・持ち運び用） |
@@ -70,7 +72,7 @@ interface IAcceptsPaste                                  // 貼り付け（ク�
 ```
 - 登録は `FeatureRegistry.Create()` の 1 か所（タブ順 = 重ね順の下から。起動時は先頭の下地を開く）: `FrameFeature`（下地）, `PictureFeature`（画像）, `StampFeature`（スタンプ）,
   `TextFeature`（文字）, `QuantizeFeature`（減色）。**機能を外す = この行と Feature のファイル（とその `BoardObject` 種類）を消す**。
-- Feature 同士は参照しない。共有するものは `EditorHost`: `Doc`, `Quantize`, `Text`, `Stamps`, `Frames`, `Settings`, `Log`, `Owner`,
+- Feature 同士は参照しない。共有するものは `EditorHost`: `Doc`, `Quantize`, `Text`, `FullColor`, `Stamps`, `Frames`, `Settings`, `Log`, `Owner`,
   `Refresh()`, `AddObject(o)`（中央に置いて選択）, `CheckpointFor(key)`（つまみ等の連続変更を 1.5 秒単位で 1 つの undo にまとめる）。
 - 設定キーは Feature ごとに接頭辞（`frame.` `stamp.` `text.` `picture.`〔`picture.fit` = 置き方〕。減色は初版からの `dither` 等）。
 - 部品: `ResetSlider`（Windows 標準の TrackBar、1 刻み・吸着なし。上に ▼ = 既定値に戻す（位置は TBM_GETCHANNELRECT /
@@ -80,7 +82,7 @@ interface IAcceptsPaste                                  // 貼り付け（ク�
   丸 = 回転、矢印 = 1px（Shift 10px）、Delete = 削除、Esc = 選択解除。表示はフルカラー（編集中）か下書き（10 色、`ShowDraft`。最新の下書きがあるときだけ）。
 - 描画（検出・入力方式・開始・続きから・中止・進捗・ログ）、下書き・表示切替、undo/redo・PNG 保存は Feature ではなく `MainForm` 常設。
 - `EditorHost` の主な API: `Invalidate()` / `RenderNow()`、`Composite`、`MakeDraft()` / `Draft` / `DraftStale` / `Plan` /
-  `EnsureDraftAsync()`、`SetQuantize(opts)`、イベント `Rendered` / `DraftChanged` / `QuantizeChanged`。
+  `EnsureDraftAsync()`、`SetQuantize(opts)`、`FullColor`（入力方式がフルカラーか。`MainForm` が入力方式の変更ごとに設定する。下の「フルカラーモードの文字」）、イベント `Rendered` / `DraftChanged` / `QuantizeChanged`。
 
 ## 各 Feature
 | タブ | できること |
@@ -88,7 +90,7 @@ interface IAcceptsPaste                                  // 貼り付け（ク�
 | 画像 | 開く（ボタン / ドロップ / 貼り付け / exe への引数。貼り付けは `IAcceptsPaste.PasteImage`、名前「クリップボード」）→ `PictureObject` を最背面に置いて選択、置き方（全体を収める〔既定〕/ トリミングして埋める / 等倍）。選択中: 大きさ 1〜400%（100% = 読み込んだ画素の等倍）・回転 ±180°・看板に合わせる（今の置き方で置き直す）・前面へ・背面へ・看板から削除。画像を選ぶとこのタブに切り替わる（`Owns`） |
 | 下地 | 背景色（10 色、常に有効）とフレーム一覧（「なし」+ 登録済み）を別々に選ぶ。登録（ファイル →「背景を消す」〔既定オフ、設定キー `frame.removeBg`、`StampPrep.RemoveBackground` でスタンプと同じ処理、切り詰めなし〕→ 合わせ方（既定: トリミングして埋める）で 320x240 に配置（アルファはそのまま）→ フルカラーのまま保存。減色は下書きで。「全体を収める」の余白は透明）。削除は複数選択・Delete・右クリック・「選んだものを削除」・「削除を元に戻す」（スタンプと共通） |
 | スタンプ | 一覧（クリックで中央に等倍で置く。複数選択・削除・「削除を元に戻す」は下地と共通、元画像の 1 画素 = 看板の 1 画素 = 100%）、登録（複数選択可、背景を消す〔既定オフ〕、切り詰め後 320×240 を超えるものは登録せず一覧で知らせる）、選択中: 大きさ 5〜400%・回転 ±180°・前面へ・背面へ・看板から削除 |
-| 文字 | 文字の形: **公式と同じ（ドット文字）** / フォントを選ぶ。文字（複数行可）・サイズ（公式 10〜22px / 自由 6〜200px、モードごとに記憶）・太字（自由のみ）・色・縁取り（なし / 10 色）・縁の幅 1〜5・回転（自由のみ）・文字を追加。選択中の文字には即反映。貼り付け（`IAcceptsPaste.PasteText`）= 貼ったテキストを今の設定で追加 |
+| 文字 | 文字の形: **公式と同じ（ドット文字）** / フォントを選ぶ（入力方式がフルカラーのあいだはなめらか〔アンチエイリアス〕に描く）。文字（複数行可）・サイズ（公式 10〜22px / 自由 6〜200px、モードごとに記憶）・太字（自由のみ）・色・縁取り（なし / 10 色）・縁の幅 1〜5・回転（自由のみ）・文字を追加。選択中の文字には即反映。貼り付け（`IAcceptsPaste.PasteText`）= 貼ったテキストを今の設定で追加 |
 | 減色 | ディザ・強さ・明るさ・コントラスト・彩度（▼ で戻す）・使う色 |
 
 ## クリップボードから貼り付け
@@ -128,6 +130,28 @@ Ctrl+V・「貼り付け」ボタン（[ui.md](ui.md)）で、クリップボー
 - 経緯: 画面右のタブの「開く」「追加」を使わずに、ブラウザ・ペイント・Office・スクリーンショットなどから直接置けるようにした
   （`Clipboard` の変化は監視しない。ボタンを押したときに読むだけ）。
 
+## フルカラーモードの文字（`IRenderServices.Smooth`、`EditorHost.FullColor`）
+入力方式が「フルカラー（直接書き込み）」のときは減色しないので、文字を 1 値（パレットの 1 色・2 値のマスク）に丸める理由がない。
+「フォントを選ぶ」の文字と縁取りを**アンチエイリアスで描き、自由な画素として合成**する（にじみ・ぎざぎざのない書き込みになる）。色はパレットの 10 色のまま。
+- **API（実装はこのとおり）**:
+  | 部品 | 内容 |
+  |---|---|
+  | `IRenderServices.Smooth` | `bool Smooth { get; }`。true = 文字をなめらかに描く。`GdiTextRasterizer` は設定可能なプロパティ（既定 false）。テストの代役（`BlockText` 等）は `false` を返す（net48 は既定インターフェース実装が使えないので、実装側に 1 行足す） |
+  | `ITextRasterizer.RasterizeCoverage` | `void RasterizeCoverage(TextObject t, byte[] letter, byte[] outline, int pageW, int pageH)`。ページ大（行優先）の 2 つの配列にカバレッジ 0〜255（0 = 触れない、255 = 全部覆う）を**書き込む**（呼び出し側が 0 で初期化して渡す）。`letter` = 字の面、`outline` = 縁取りを含む領域（字の面の下も 255。縁取りなし / 幅 0 なら全部 0）。変換（倍率・回転・中心）は `Rasterize` と同じ。`t.Official` のときは 2 値と同じ内容（0 / 255）を返す |
+  | `EditorHost.FullColor` | `bool FullColor { get; set; }`。設定で `Text.Smooth` を同じ値にし、変わったときだけ `Invalidate()`（再描画 + 下書きを古くする）。`MainForm.OnInputMode` が `host.FullColor = (入力方式 == フルカラー)` を呼ぶ（起動時の設定の復元も同じ経路）。下書き表示中でも古くなるだけで、自動では作り直さない |
+- **`TextObject.Render`**: `Text` が空か `services?.Text == null` なら何もしない（今まで通り）。`!services.Smooth` または `Official` なら今までの 2 値の道（`Rasterize` → `SetFixed`）。
+  それ以外は `RasterizeCoverage` で `letter` / `outline` を得て、画素ごとに **縁取り（`Outline >= 0` で `outline[i] > 0`）を先に**
+  `target.Blend(i, 縁取り色の R, G, B, outline[i] / 255.0)`、**続けて字**（`letter[i] > 0`）を `Blend(i, 色の R, G, B, letter[i] / 255.0)`
+  で重ねる（縁取りの上に字。端の画素は下の絵・縁取り・字がカバレッジに応じて混ざる）。`Blend` は画素を自由にするので減色・ディザの対象になる
+  （フルカラーの書き込みでは減色しないので影響しない）。パレット色は `Palette.All[色番号]`。
+- **`GdiTextRasterizer.RasterizeCoverage`**: `Rasterize` と同じ経路（`LocalPath`、同じ変換）を `SmoothingMode.AntiAlias`・`PixelOffsetMode.Half` で塗る。
+  2 回に分ける（重なる縁を 1 枚の画像で混ぜない）: ① 縁取りの領域（`Widen` した輪郭 + 字の面）を白で塗った黒地の画像 → R チャンネル = `outline`、
+  ② 字の面だけ → R チャンネル = `letter`。`Official` は 2 値の `RasterizeOfficial` の結果から作る。測る箱（`Measure`）は変えない（AA の薄い縁は箱の外に 1 画素出うる。ページの範囲で切るだけ）。
+- **2 値の道は残す**: `Smooth` が false（テスト・ペンの入力方式・`Bench`・既定）なら今までと画素単位で同じ（固定・2 値・下書きは 10 色にそのまま）。
+  ペンの入力方式に戻したら `FullColor = false` で再描画され、文字は固定・2 値に戻る。下書き（10 色）の文字がにじまないのはこの道の性質。
+- フルカラーモード中の「下書き」表示はなめらかな文字を減色したもの（書き込みには使わない。ペンの下書きと同じ見た目ではない）。
+- 文字の見た目の設定（太さ・縁の幅・色）は同じ。AA の縁取り（幅 1）は 2 値より細く見えるので、必要なら縁の幅を上げる。
+
 ## 公式と同じ文字（`TextObject.Official`、`Win/OfficialText`）
 - 公式の文字ツール（`TextTool.drawText`）は Java の論理フォント `SansSerif`（12pt、普通の太さ）で `drawString`。JRE の fontconfig
   （`sequence.sansserif.windows-31j=alphabetic,japanese`）で英数字は **Arial**、それ以外は **MS ゴシック**（`exclusion.alphabetic`
@@ -163,6 +187,7 @@ Ctrl+V・「貼り付け」ボタン（[ui.md](ui.md)）で、クリップボー
 - undo/redo（オブジェクト・下地・選択）、z 順: `EditingTests.UndoRedoRestoresObjectsBackgroundAndSelection`, `RestackAndHitTestUseTheZOrder`
 - 背景除去と切り詰め、320×240 の判定: `StampPrepTests`。ライブラリ（壊れた行を無視）: `LibraryTests`
 - GDI+ の文字が 2 値・縁取りあり・測った箱の中、再描画速度: `GdiTextTests`
+- フルカラーモードの文字: `SmoothTextTests`（代役のラスタライザが 0 / 128 / 255 のカバレッジを返す）— `Smooth = false` は今までと同じ（固定・2 値）、`Smooth = true` で 128 の画素が自由（`Fixed = -1`）で背景と文字色の中間の色になる・255 はちょうど文字色（自由）・縁取りは字の下（字の画素は字の色、縁取りだけの画素は縁取り色）・縁取りなしなら `outline` は使わない・`Official` は `Smooth` でも 2 値で固定・空の文字は何もしない。GDI 実物: `Smooth` の `RasterizeCoverage` に 0 と 255 以外の値がある、`Rasterize`（2 値）と覆う範囲がほぼ同じ、`Smooth` が false のとき `Rasterize` は変わらない
 - 公式文字: Java の描画と全サイズで画素一致、近似でも日本語は一致、回転・拡縮しない・整数座標、縁取り: `OfficialTextTests`
 - 貼り付け（`ClipboardContent.Read` を `DataObject` で）: 形式の優先順位（ファイル > PNG > Bitmap > テキスト、画像とテキストが両方なら画像、画像でないファイルは飛ばして次へ）、PNG のアルファが残る（Bitmap は不透明）、テキストの前後の空白・空行除去（途中の改行は残す）、空・空白だけ・何も無いなら `None`（何も置かない）: `PasteTests`。画像・文字の追加そのものは既存の処理（`PictureTests` など）
 - 画面込みの通し: `tools/gui-e2e.sh`（開発環境のテスト）

@@ -1,10 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
+using Microsoft.Win32;
 
 namespace KanbanDrawer.Win
 {
@@ -17,18 +19,85 @@ namespace KanbanDrawer.Win
     {
         public const string DefaultGameJar = @"C:\Program Files (x86)\InterPot3\InterPot3.jar";
         public const string AgentResource = "KanbanDrawer.kanban-agent.jar";
-        public const string ShortcutName = "InterPot3 (フルカラー).lnk";
+        public const string ShortcutName = "InterPot3 (屋).lnk";
+        const string UninstallKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall";
 
         /// <summary>
-        /// InterPot3.jar: the configured path (setting <c>fullcolor.jar</c>), else the default install, else the user picks
-        /// it. Only existing files count; null when none (dialog cancelled).
+        /// InterPot3.jar (docs/design/fullcolor.md「InterPot3.jar の場所」): the configured path (setting <c>fullcolor.jar</c>),
+        /// else the auto-detected install (<see cref="FindInstalled"/>, used silently and not saved), else the user picks it.
+        /// Only existing files count; null when none (dialog cancelled). Saving a picked path is the caller's job.
         /// </summary>
         public static string LocateGame(string configured, IWin32Window owner)
         {
             if (!string.IsNullOrEmpty(configured) && File.Exists(configured)) return configured;
-            if (File.Exists(DefaultGameJar)) return DefaultGameJar;
+            string found = FindInstalled();
+            if (found != null) return found;
             using (var d = new OpenFileDialog { Title = "InterPot3.jar を選んでください", Filter = "InterPot3.jar|InterPot3.jar|jar|*.jar", FileName = "InterPot3.jar" })
                 return d.ShowDialog(owner) == DialogResult.OK && File.Exists(d.FileName) ? d.FileName : null;
+        }
+
+        /// <summary>
+        /// The installed InterPot3.jar: the uninstall entry named InterPot3 (64-bit then 32-bit registry view, read only),
+        /// else the default install folder. Null when neither exists. Writes nothing.
+        /// </summary>
+        public static string FindInstalled()
+        {
+            string found = PickInstallLocation(UninstallEntries(), File.Exists);
+            if (found != null) return found;
+            return File.Exists(DefaultGameJar) ? DefaultGameJar : null;
+        }
+
+        /// <summary>
+        /// The first entry whose DisplayName is InterPot3 (case-insensitive) and whose InstallLocation (quotes and trailing
+        /// backslashes removed) holds an existing InterPot3.jar: that jar's path, or null.
+        /// </summary>
+        public static string PickInstallLocation(IEnumerable<(string DisplayName, string InstallLocation)> entries, Func<string, bool> exists)
+        {
+            foreach (var (name, location) in entries)
+            {
+                if (!string.Equals(name?.Trim(), "InterPot3", StringComparison.OrdinalIgnoreCase)) continue;
+                string dir = location?.Trim().Trim('"').Trim().TrimEnd('\\');
+                if (string.IsNullOrEmpty(dir)) continue;
+                string jar;
+                try { jar = Path.Combine(dir, "InterPot3.jar"); }
+                catch (ArgumentException) { continue; } // invalid characters in a hand-edited value
+                if (exists(jar)) return jar;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// (DisplayName, InstallLocation) of HKLM\...\Uninstall\* in the 64-bit then the 32-bit view. Read only
+        /// (<c>OpenSubKey(name, false)</c>), every key disposed, registry errors ignored. Collected eagerly so no key stays open.
+        /// </summary>
+        static List<(string, string)> UninstallEntries()
+        {
+            var list = new List<(string, string)>();
+            foreach (var view in new[] { RegistryView.Registry64, RegistryView.Registry32 })
+            {
+                try
+                {
+                    using (var hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, view))
+                    using (var uninstall = hklm.OpenSubKey(UninstallKey, false))
+                    {
+                        if (uninstall == null) continue;
+                        foreach (string sub in uninstall.GetSubKeyNames())
+                        {
+                            try
+                            {
+                                using (var k = uninstall.OpenSubKey(sub, false))
+                                {
+                                    if (k?.GetValue("DisplayName") is string name && k.GetValue("InstallLocation") is string location)
+                                        list.Add((name, location));
+                                }
+                            }
+                            catch (Exception) { } // an unreadable entry
+                        }
+                    }
+                }
+                catch (Exception) { } // no such view / no access
+            }
+            return list;
         }
 
         /// <summary>True when this build carries the agent jar (it is made separately, Java/KanbanAgent.java).</summary>
@@ -91,7 +160,7 @@ namespace KanbanDrawer.Win
                 Set("WorkingDirectory", dir);
                 Set("IconLocation", IconFor(dir, java) + ",0");
                 lt.InvokeMember("Save", BindingFlags.InvokeMethod, null, link, null);
-                log("ショートカットを作りました: " + path);
+                log("デスクトップにIP起動用リンク「InterPot3 (屋)」を生成しました");
                 return true;
             }
             catch (Exception e)
