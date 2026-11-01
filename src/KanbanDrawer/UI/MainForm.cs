@@ -70,8 +70,8 @@ namespace KanbanDrawer.UI
             using (var icon = typeof(MainForm).Assembly.GetManifestResourceStream("KanbanDrawer.app.ico")) Icon = new Icon(icon);
             Font = new Font("Yu Gothic UI", 9f);
             AutoScaleMode = AutoScaleMode.Dpi;
-            ClientSize = new Size(744, 600);
-            MinimumSize = new Size(700, 540);
+            ClientSize = new Size(744, 660);
+            MinimumSize = new Size(700, 600);
             AllowDrop = true;
             KeyPreview = true;
 
@@ -127,6 +127,7 @@ namespace KanbanDrawer.UI
             // the agent jar for the shortcut / launch, rewritten only when it differs (a missing jar is reported on use)
             Task.Run(() => { try { GameLauncher.ExtractAgent(); } catch (Exception) { } });
             Log("画像やスタンプ・文字で看板を作り、InterPot で看板の編集画面を開いて「描画開始」。保存はご自身で。");
+            Shown += (s, e) => EnsureLogLines();
             if (picture != null) Shown += (s, e) => OpenFile(picture);
         }
 
@@ -174,6 +175,18 @@ namespace KanbanDrawer.UI
             left.HandleCreated += (s, e) => BeginInvoke((Action)FitLog);
             Controls.Add(tabs);
             Controls.Add(left);
+        }
+
+        /// <summary>
+        /// Once at start: the log shows at least 6 lines (5 in full colour, whose state row takes height). 744x660 gives that
+        /// with Yu Gothic UI 9pt; a taller font grows the window by what is missing (docs/design/ui.md「ログ欄の高さ」).
+        /// </summary>
+        void EnsureLogLines()
+        {
+            if (WindowState != FormWindowState.Normal) return;
+            fitLog?.Invoke();
+            int need = (FullColor ? 5 : 6) * log.Font.Height + 4;
+            if (log.Height < need) Height += need - log.Height;
         }
 
         /// <summary>Full colour only: the link's state on the left, starting the game / making its shortcut on the right.</summary>
@@ -492,13 +505,14 @@ namespace KanbanDrawer.UI
                 Log("ゲームとの接続が切れました");
         }
 
-        /// <summary>「InterPot を起動」/「ショートカットを作成」, InterPot3.jar from the setting, the default place or a dialog (then saved).</summary>
+        /// <summary>「InterPot を起動」/「ショートカットを作成」, InterPot3.jar from the setting, the auto-detected install or a dialog (then saved).</summary>
         void LaunchGame(bool shortcut)
         {
             string configured = settings.Get("fullcolor.jar", "");
             string jar = GameLauncher.LocateGame(configured, this);
             if (jar == null) { Log("InterPot3.jar が見つかりません"); return; }
-            if (jar != configured && jar != GameLauncher.DefaultGameJar) settings.Set("fullcolor.jar", jar); // picked in the dialog
+            // only a path picked in the dialog is saved; an auto-detected one is looked up again each time
+            if (jar != configured && jar != GameLauncher.FindInstalled()) settings.Set("fullcolor.jar", jar);
             if (shortcut) GameLauncher.CreateShortcut(jar, Log);
             else GameLauncher.Launch(jar, Log);
         }
