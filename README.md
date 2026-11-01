@@ -8,6 +8,7 @@ Windows 版 InterPot3 の看板エディタに、好きな絵を自動で描く�
 
 - `KanbanYeah.exe` 1 つで動きます（Windows 10 / 11、追加インストール不要、管理者権限不要）。
 - 画像・スタンプ・文字・フレームを組み合わせて看板を作り、看板の 10 色・1px ペンで描きます。描いたあとの「保存」はご自身で押してください。
+- 実験的に、ゲームを看板屋から起動して、10 色以外の色も含むフルカラーで直接書き込むこともできます（「フルカラーで書き込む」の節）。
 - 描画中もマウスは自由に使えます（既定の「バックグラウンド」方式）。
 
 <img width="742" height="628" alt="image" src="https://github.com/user-attachments/assets/cbf093e5-fe57-479b-8f81-7a296252b129" />
@@ -40,6 +41,22 @@ Windows 版 InterPot3 の看板エディタに、好きな絵を自動で描く�
 登録したスタンプ・フレームの削除: 一覧で Ctrl+クリック（Shift+クリックで範囲、Ctrl+A ですべて）して選び、Delete キー、
 右クリックの「削除」、または「選んだものを削除」を押します。確認は出ませんが、「削除を元に戻す」で直前の 1 回分は戻せます。
 
+## フルカラーで書き込む（実験的）
+ペンでは 10 色しか使えませんが、ゲームの中に小さなプログラムを入れて、看板の画素へ直接書き込むこともできます（10 色以外の色が使えます）。
+1. 看板屋の入力方式を **「フルカラー（直接書き込み）」** にします（下に状態と 2 つのボタンが出ます）。
+2. すでに InterPot が動いているときは閉じて、**「InterPot を起動」**（またはデスクトップに作れる**「ショートカットを作成」**のショートカット。
+   看板屋が起動していなくても使えます）で InterPot を起動します。`InterPot3.jar` の場所を聞かれたら選んでください。
+3. ログインして自分の看板の編集画面を開くと、状態が「接続中: エディタあり」になります。
+4. 「描画開始」で、いまの看板（減色しない）がそのまま書き込まれます。確認して、InterPot の「保存」をご自身で押してください。
+5. 看板屋なしでも、InterPot の看板編集画面にフォーカスがあるとき **Ctrl+Shift+V** で、クリップボードの画像を看板に収めて書き込めます。
+
+注意（フルカラー）:
+- **10 色以外の色の看板になります**。ゲームの画面では作れない色なので、ほかの利用者から見て不自然かもしれません。
+- **実験的な機能で、自己責任**です（保存した看板が思った通りに表示されるかは、お使いの環境でお確かめください）。
+- InterPot のファイルは書き換えません（Java の標準の仕組み `-javaagent` で、起動時に読み込ませているだけです）。サーバーへ独自の通信もしません。
+  保存はゲーム自身の「保存」です。
+- 看板屋との連絡は、この PC の中の同じユーザーだけが使える名前付きパイプです。ネットワークには何も開きません。
+
 ## 注意
 - 描画中は、ゲームの看板を他のウィンドウで隠したり、ゲームをクリックしたりしないでください（中断します）。
 - 「ゲームの画面が描画に追いついていません」で止まったら、ゲームを最小化して元に戻す（またはゲームを再起動する）と直ります。
@@ -55,8 +72,14 @@ Windows 版 InterPot3 の看板エディタに、好きな絵を自動で描く�
 - 「公式と同じ」文字の描画プログラム（`src/KanbanDrawer/Java/KanbanText.java`）を変えたときだけ、JDK で jar を作り直します
   （Java 8 で動くように `--release 8`）:
   ```
-  javac --release 8 -encoding UTF-8 -d out src/KanbanDrawer/Java/*.java
+  javac --release 8 -encoding UTF-8 -d out src/KanbanDrawer/Java/KanbanText.java
   jar cf src/KanbanDrawer/Resources/kanban-text.jar -C out .
+  ```
+- フルカラー用のエージェント（`src/KanbanDrawer/Java/KanbanAgent.java`）を変えたときも同様（jar にはマニフェスト
+  `src/KanbanDrawer/Java/kanban-agent.mf` = `Premain-Class: KanbanAgent` が要ります）:
+  ```
+  javac --release 8 -encoding UTF-8 -d outagent src/KanbanDrawer/Java/KanbanAgent.java
+  jar cfm src/KanbanDrawer/Resources/kanban-agent.jar src/KanbanDrawer/Java/kanban-agent.mf -C outagent .
   ```
 - 単体テスト: `dotnet test tests/KanbanDrawer.Tests`。「公式と同じ」文字を Java の描画と突き合わせるテストは、
   .jar を開く Java がない環境（CI など）では何もせずに通ります。
