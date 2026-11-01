@@ -70,7 +70,7 @@ KanbanYeah.exe --dotfont-dump dir 10-22 chars.txt                         … �
 | 変数 | 意味 |
 |---|---|
 | `KANBANDRAWER_DATA` | 設定・ライブラリの置き場所（既定 `%APPDATA%\KanbanDrawer`）。テストはここを差し替えてユーザーのライブラリを汚さない |
-| `KANBANYEAH_PIPE` | フルカラー連携のパイプ名（`\\.\pipe\` の後ろ。既定 `KanbanYeah-<ユーザーの SID>`）。テスト用（[fullcolor.md](fullcolor.md)） |
+| `KANBANDRAWER_PIPE` | フルカラー連携のパイプ名（`\\.\pipe\` の後ろ。既定 `KanbanYeah-<ユーザーの SID>`）。テスト用（[fullcolor.md](fullcolor.md)） |
 | `KANBANDRAWER_TRACE` | 描画のトレース（パス・フェンスの待ち時間/タイムアウト・ボタン確認・読み戻し）を追記するファイル |
 
 ## 未テスト
