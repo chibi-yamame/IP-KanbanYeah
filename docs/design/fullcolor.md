@@ -36,14 +36,12 @@
 
 ## エージェント（`KanbanAgent`）
 ### 起動
-`javaw -Dsun.java2d.d3d=false -javaagent:<kanban-agent.jar> -jar InterPot3.jar`。`premain(String args, Instrumentation)` が
+`javaw -javaagent:<kanban-agent.jar> -jar InterPot3.jar`（足すオプションは `-javaagent` だけ。下の「システムへの影響・リソース」）。`premain(String args, Instrumentation)` が
 デーモンスレッド（パイプ用 `KanbanAgent`）を起動し、キー用の AWT リスナーを登録して戻る。
 - 引数 `args` は省略可（パイプ名を丸ごと指定するテスト用。例 `-javaagent:kanban-agent.jar=KanbanYeah-test1`）。省略時は
   `KanbanYeah-` + 現在のユーザーの SID（`com.sun.security.auth.module.NTSystem().getUserSID()`、Java 8 の Windows 版に標準）。
   SID が得られなければパイプ連携は無効（キー Ctrl+Shift+V は使える）。
 - エージェントのどんな例外もゲームに伝えない（全部 `Throwable` で受けて、標準エラーへ出すだけ）。ゲームの動作に影響しない。
-- `-Dsun.java2d.d3d=false`: Direct3D パイプラインで看板の画像が描かれない状態になることがあったため（[drawing.md](drawing.md) 落とし穴）。
-  ゲームの見た目・動作は通常変わらない想定（実ゲームで確認する。未テスト）。
 
 ### 看板エディタの探し方
 `Frame.getFrames()` の各フレームとその `getOwnedWindows()` の部品木（`Container.getComponents()` を再帰）から、クラス名が
@@ -84,7 +82,7 @@ AWT のイベントスレッド以外から木を辿ってよい（読むだけ�
 ### 起動（「InterPot を起動」）
 1. Java: `JavaHelper.FindJavaw()`（.jar を開く Java の `javaw.exe`。無ければ `java.exe`）。無ければログ「InterPot を動かす Java（.jar を開くプログラム）が見つかりません」で終わり。
 2. エージェントの jar を `%LOCALAPPDATA%\KanbanDrawer\kanban-agent.jar` に書き出す（`JavaHelper.Extract("KanbanDrawer.kanban-agent.jar", "kanban-agent.jar")`）。
-3. `Process.Start`（`UseShellExecute = false`、作業フォルダ = `InterPot3.jar` のフォルダ、引数 `-Dsun.java2d.d3d=false -javaagent:"<agent jar>" -jar "<InterPot3.jar>"`）。
+3. `Process.Start`（`UseShellExecute = false`、作業フォルダ = `InterPot3.jar` のフォルダ、引数 `-javaagent:"<agent jar>" -jar "<InterPot3.jar>"`）。
    `JavaHelper.Start` のジョブオブジェクトには**入れない**（看板屋を閉じてもゲームは続ける）。標準出力・入力は取らない。
 4. ログ「InterPot を起動しました（フルカラー用）。ログインして看板の編集画面を開くと、状態が「接続中: エディタあり」になります」。
 既にゲームが動いていても起動する（二重起動の判定はしない。ゲーム自身の仕組みに任せる）。
@@ -95,7 +93,7 @@ AWT のイベントスレッド以外から木を辿ってよい（読むだけ�
 | 項目 | 値 |
 |---|---|
 | ターゲット | 起動と同じ Java（javaw） |
-| 引数 | 起動と同じ `-Dsun.java2d.d3d=false -javaagent:"<agent jar>" -jar "<InterPot3.jar>"` |
+| 引数 | 起動と同じ `-javaagent:"<agent jar>" -jar "<InterPot3.jar>"` |
 | 作業フォルダ | `InterPot3.jar` のフォルダ |
 | アイコン | `InterPot3.jar` と同じフォルダに `.ico` があればその最初のもの、無ければ同じフォルダの `.exe` の最初のもの、無ければ Java のもの |
 作成前にエージェントの jar も書き出す。ログ「ショートカットを作りました: <パス>」。看板屋を閉じていてもこのショートカットでゲームを起動すればエージェントは入る。
@@ -177,6 +175,22 @@ AWT のイベントスレッド以外から木を辿ってよい（読むだけ�
   保存するまでは再読込（別のページへ移って戻る）でも元に戻る。
 - エージェントの jar は看板屋の exe に内蔵（`%LOCALAPPDATA%\KanbanDrawer` に書き出すだけ）。ゲームのフォルダには何も書かない。
 - エージェントは例外を握りつぶしてゲームの動作に影響させない。ゲームを閉じればエージェントも終わる（デーモンスレッド）。
+
+## システムへの影響・リソース（利用者の要件）
+- **Windows のシステムに影響を与えない**: レジストリ・環境変数（`JAVA_TOOL_OPTIONS` などを含む）・ファイルの関連付け・ファイアウォールは触らない。
+  管理者権限は要らない。TCP のポートは開かない。書くファイルは `%LOCALAPPDATA%\KanbanDrawer\kanban-agent.jar` と、利用者が「ショートカットを作成」を
+  押したときのデスクトップの .lnk だけ。ゲームのフォルダには何も書かない。エージェントもファイル・レジストリ・環境変数を書かない。
+- **起動のオプションは最低限**: ゲームの起動に足すのは `-javaagent:"<agent jar>"` だけ（描画方式などの JVM オプションは足さない）。エージェントは
+  システムプロパティ・セキュリティマネージャー・既定のツールキット・見た目（Look & Feel）など JVM 全体の設定を変えない。足すのは、パイプ用の
+  デーモンスレッド 1 本、観測だけの AWT イベントリスナー 1 つ、Ctrl+Shift+V のときだけ動いて終わるクリップボード用のスレッド（同時に 1 つまで）だけ。
+- **リソースをリークしない**:
+  - 看板屋: `NamedPipeServerStream`・タイマー・`CancellationTokenSource` は必ず `Dispose`。待ち受け直しでタスクやストリームを溜めない。看板屋を閉じるときに
+    待ち受けを止めてパイプを閉じる。起動したゲームの `Process` は持ち続けず、起動直後に `Dispose`。`WScript.Shell` とショートカットの COM オブジェクトは
+    `finally` で `Marshal.FinalReleaseComObject`。イベントの登録解除。
+  - エージェント: 接続ごとの `RandomAccessFile` と `available()` 用の `FileInputStream` は、どの失敗の道でも `finally` で閉じる。つなぎ直しでスレッドや
+    ハンドルを増やさない。書き込み後に画像の配列を持ち続けない。Ctrl+Shift+V を押し続けても、クリップボード用のスレッドは 1 つまで（動いている間は無視）。
+  - テスト: 看板屋の待ち受けの開始・停止、接続・切断を繰り返しても、毎回新しいサーバーが作れる（`AgentLinkTests`）。エージェントはサーバーの停止・再開を
+    繰り返してもスレッドが 1 本のまま再接続する（開発環境側の確認）。
 
 ## 不変条件とテスト
 - `AgentLinkTests`（メモリ上のストリームで `AgentSession` を検証。CI で実行）:
