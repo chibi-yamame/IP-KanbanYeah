@@ -25,6 +25,15 @@ namespace KanbanDrawer.Win
             return File.Exists(java) ? java : exe;
         }
 
+        /// <summary>javaw.exe (no console window) next to <see cref="FindJava"/>, else the same as FindJava; null when none.</summary>
+        public static string FindJavaw()
+        {
+            string java = FindJava();
+            if (java == null) return null;
+            string javaw = Path.Combine(Path.GetDirectoryName(java), "javaw.exe");
+            return File.Exists(javaw) ? javaw : java;
+        }
+
         static string AssocExecutable(string ext)
         {
             const int ASSOCSTR_EXECUTABLE = 2;
