@@ -69,7 +69,7 @@ namespace KanbanDrawer.UI.Features
                 Ui.Button("背面へ", () => host.Doc.Restack(current, -1)),
                 Ui.Button("看板から削除", () => host.Doc.Remove(current)));
             p.Controls.Add(objectButtons);
-            p.Controls.Add(Ui.Note("文字は 10 色のまま描きます（にじみません）。選択中の文字は、ここでの変更がすぐ反映されます。\n" +
+            p.Controls.Add(Ui.Note("文字は 10 色で、にじまずに描きます（フルカラーではなめらかに）。選択中の文字は、ここでの変更がすぐ反映されます。\n" +
                 "公式と同じ: InterPot の文字ツールと同じ字形（10〜22px・既定 12px）。", 50));
 
             official.CheckedChanged += (s, e) => { if (official.Checked) SwitchMode(true); };
