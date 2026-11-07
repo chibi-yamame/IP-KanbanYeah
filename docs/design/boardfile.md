@@ -63,7 +63,7 @@ JSON は使わず、設定ファイル（[ui.md](ui.md)「設定」）と同じ 
 ```
 kanban-board=1
 background=2
-quantize.dither=1
+quantize.dither=fs
 quantize.strength=100
 quantize.brightness=0
 quantize.contrast=0
