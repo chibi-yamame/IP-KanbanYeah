@@ -99,6 +99,20 @@ namespace KanbanDrawer.UI.Features
             if (draftVersion == before) MarkStale();
         }
 
+        /// <summary>
+        /// Settings from an opened board: the 減色 tab shows and applies them when it is there
+        /// (<see cref="QuantizeLoadRequested"/>), otherwise they are set directly.
+        /// </summary>
+        public void ApplyQuantize(QuantizeOptions o)
+        {
+            var handler = QuantizeLoadRequested;
+            if (handler != null) handler(o);
+            else SetQuantize(o);
+        }
+
+        /// <summary>Asks the 減色 tab to take these settings (see <see cref="ApplyQuantize"/>).</summary>
+        public event Action<QuantizeOptions> QuantizeLoadRequested;
+
         void MarkStale()
         {
             if (DraftStale) return;
