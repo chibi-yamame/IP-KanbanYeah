@@ -7,8 +7,9 @@ using KanbanDrawer.Win;
 namespace KanbanDrawer.UI.Features
 {
     /// <summary>
-    /// Deleting from a library list, shared by スタンプ and 下地: no confirmation, 「選んだものを削除」 (with the count) and
-    /// 「削除を元に戻す」 (the last deletion). Right click 削除 and the Delete key come from <see cref="ThumbnailList"/>.
+    /// Deleting from a library list, shared by スタンプ and 下地: no confirmation, 「選んだものを削除」 (with the count, at the
+    /// right end of the 登録... row: <see cref="Row"/>) and the right-click menu's 「削除を元に戻す」 (the last deletion).
+    /// Right click 削除 and the Delete key come from <see cref="ThumbnailList"/>.
     /// Empties the library's trash when created (startup), so only deletions of this session can be restored.
     /// </summary>
     internal sealed class LibraryDelete
@@ -21,7 +22,6 @@ namespace KanbanDrawer.UI.Features
         DeletionRecord last;
 
         public readonly Button DeleteButton;
-        public readonly Button UndoButton;
 
         /// <param name="noun">「スタンプ」 / 「フレーム」 for the log</param>
         /// <param name="reload">refills the list after a change</param>
@@ -30,8 +30,9 @@ namespace KanbanDrawer.UI.Features
             this.host = host; this.library = library; this.list = list; this.noun = noun; this.reload = reload;
             library.EmptyTrash();
             DeleteButton = Ui.Button("選んだものを削除", () => Delete(list.CheckedIds));
-            UndoButton = Ui.Button("削除を元に戻す", Undo);
             list.DeleteRequested += Delete;
+            list.RestoreRequested += Undo;
+            list.CanRestore = () => library.CanRestore(last);
             list.CheckedChanged += Sync;
             Sync();
         }
@@ -41,7 +42,25 @@ namespace KanbanDrawer.UI.Features
             int n = list.CheckedIds.Count;
             DeleteButton.Text = n > 0 ? $"選んだものを削除（{n}）" : "選んだものを削除";
             DeleteButton.Enabled = n > 0;
-            UndoButton.Enabled = library.CanRestore(last);
+        }
+
+        /// <summary>The library row: 登録... and its options on the left, 「選んだものを削除」 at the right end.</summary>
+        public Control Row(params Control[] left)
+        {
+            var r = new TableLayoutPanel { Height = 30, ColumnCount = left.Length + 2, Margin = new Padding(0, 2, 0, 2) };
+            foreach (var c in left)
+            {
+                r.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+                c.Anchor = AnchorStyles.Left;
+                c.Margin = new Padding(0, 0, 4, 0);
+                r.Controls.Add(c);
+            }
+            r.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            r.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            DeleteButton.Anchor = AnchorStyles.Right;
+            DeleteButton.Margin = new Padding(0);
+            r.Controls.Add(DeleteButton, left.Length + 1, 0); // the column before it stretches
+            return r;
         }
 
         void Delete(IReadOnlyList<string> ids)

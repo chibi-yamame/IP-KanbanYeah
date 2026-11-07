@@ -43,6 +43,14 @@ namespace KanbanDrawer.UI.Widgets
             return p;
         }
 
+        /// <summary>The label of a <see cref="Row"/> (for its ToolTip).</summary>
+        public static Label LabelOf(Control row)
+        {
+            foreach (Control c in row.Controls)
+                if (c is Label l) return l;
+            return null;
+        }
+
         /// <summary>Buttons (or other controls) side by side.</summary>
         public static Control Buttons(params Control[] controls)
         {

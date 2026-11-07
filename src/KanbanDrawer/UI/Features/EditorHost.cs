@@ -25,6 +25,8 @@ namespace KanbanDrawer.UI.Features
         public readonly Settings Settings;
         public readonly Control Ui;
         public Action<string> Log = s => { };
+        /// <summary>The one shared ToolTip: the longer explanations that do not fit a tab's one-line note (docs/design/ui.md).</summary>
+        public readonly ToolTip Tips = new ToolTip { InitialDelay = 400, AutoPopDelay = 20000 };
 
         /// <summary>The board in full colour (fixed pixels already in palette colours).</summary>
         public Composite Composite { get; private set; }

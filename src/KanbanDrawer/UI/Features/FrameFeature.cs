@@ -32,16 +32,25 @@ namespace KanbanDrawer.UI.Features
         {
             host = h;
             var p = new StackPanel();
-            p.Controls.Add(Ui.Heading("背景色"));
-            p.Controls.Add(Ui.Row("色", color));
-            p.Controls.Add(Ui.Note("フレームの透明部分や、何も置いていない所に見える色です。", 18));
+            const string colorTip = "フレームの透明部分や、何も置いていない所に見える色です。";
+            const string frameTip = "色は下書きのときに、画像・スタンプと一緒に 10 色にします。透明な部分（「全体を収める」の余白も）は透明のまま残ります。";
+            var colorHeading = Ui.Heading("背景色");
+            p.Controls.Add(colorHeading);
+            var colorRow = Ui.Row("色", color);
+            p.Controls.Add(colorRow);
+            host.Tips.SetToolTip(colorHeading, colorTip);
+            host.Tips.SetToolTip(Ui.LabelOf(colorRow), colorTip);
+            host.Tips.SetToolTip(color, colorTip);
             p.Controls.Add(Ui.Heading("フレーム"));
             p.Controls.Add(list);
-            p.Controls.Add(Ui.Buttons(Ui.Button("フレームを登録...", Register), removeBg));
+            host.Tips.SetToolTip(list, frameTip);
             var del = new LibraryDelete(host, host.Frames, list, "フレーム", Reload);
-            p.Controls.Add(Ui.Buttons(del.DeleteButton, del.UndoButton));
-            p.Controls.Add(Ui.Row("合わせ方", fit));
-            p.Controls.Add(Ui.Note("登録時に 320×240 にして保存します。色は下書きのときに、画像・スタンプと一緒に 10 色にします。透明な部分（「全体を収める」の余白も）は透明のまま残ります。\nCtrl / Shift+クリックで選んで、右クリック・Delete キーで削除できます。", 66));
+            p.Controls.Add(del.Row(Ui.Button("フレームを登録...", Register), removeBg));
+            var fitRow = Ui.Row("合わせ方", fit);
+            p.Controls.Add(fitRow);
+            host.Tips.SetToolTip(Ui.LabelOf(fitRow), frameTip);
+            host.Tips.SetToolTip(fit, frameTip);
+            p.Controls.Add(Ui.Note("登録時に 320×240 にして保存します。", 18));
             color.SelectedChanged += (s, e) =>
             {
                 host.EndCheckpointBurst();

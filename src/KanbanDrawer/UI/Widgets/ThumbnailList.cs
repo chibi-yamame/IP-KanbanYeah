@@ -10,8 +10,9 @@ namespace KanbanDrawer.UI.Widgets
     /// <summary>
     /// Wrapping list of picture tiles (library items). Click = <see cref="ItemClicked"/> (use the item). Deletable tiles
     /// can also be picked for deletion (<see cref="CheckedIds"/>, translucent blue + ✓): Ctrl+click toggles, Shift+click
-    /// picks a range, Ctrl+A picks all; a plain click clears the picks. Right click 削除 / the Delete key ask for
-    /// <see cref="DeleteRequested"/>. The item in use (<see cref="Selected"/>) is drawn as a ring, independently.
+    /// picks a range, Ctrl+A picks all; a plain click clears the picks. The Delete key and the right-click menu's 削除 ask
+    /// for <see cref="DeleteRequested"/>; the menu's 削除を元に戻す (also on the empty area) asks for <see cref="RestoreRequested"/>.
+    /// The item in use (<see cref="Selected"/>) is drawn as a ring, independently.
     /// </summary>
     internal sealed class ThumbnailList : FlowLayoutPanel
     {
@@ -25,6 +26,10 @@ namespace KanbanDrawer.UI.Widgets
         public event Action<IReadOnlyList<string>> DeleteRequested;
         /// <summary><see cref="CheckedIds"/> changed.</summary>
         public event Action CheckedChanged;
+        /// <summary>The right-click menu's 削除を元に戻す (enabled when <see cref="CanRestore"/> says so).</summary>
+        public event Action RestoreRequested;
+        /// <summary>Whether there is a deletion to restore (the menu item is disabled otherwise).</summary>
+        public Func<bool> CanRestore = () => false;
 
         public ThumbnailList(Size tileSize)
         {
@@ -56,15 +61,27 @@ namespace KanbanDrawer.UI.Widgets
             tile.MouseUp += (s, e) =>
             {
                 if (e.Button == MouseButtons.Left) OnTileClick(tile);
-                else if (e.Button == MouseButtons.Right && deletable)
-                {
-                    var ids = picked.Contains(id) ? CheckedIds : new[] { id };
-                    var menu = new ContextMenuStrip();
-                    menu.Items.Add(ids.Count > 1 ? $"削除（{ids.Count} 個）" : "削除", null, (s2, e2) => DeleteRequested?.Invoke(ids));
-                    menu.Show(tile, e.Location);
-                }
+                else if (e.Button == MouseButtons.Right)
+                    ShowMenu(tile, e.Location, deletable ? (picked.Contains(id) ? CheckedIds : new[] { id }) : null);
             };
             Controls.Add(tile);
+        }
+
+        /// <summary>Right-click menu: 削除 (for <paramref name="ids"/>, none on the empty area or a fixed tile) and 削除を元に戻す.</summary>
+        void ShowMenu(Control at, Point location, IReadOnlyList<string> ids)
+        {
+            if (DeleteRequested == null && RestoreRequested == null) return;
+            var menu = new ContextMenuStrip();
+            if (ids != null && ids.Count > 0)
+                menu.Items.Add(ids.Count > 1 ? $"削除（{ids.Count} 個）" : "削除", null, (s, e) => DeleteRequested?.Invoke(ids));
+            menu.Items.Add("削除を元に戻す", null, (s, e) => RestoreRequested?.Invoke()).Enabled = CanRestore();
+            menu.Show(at, location);
+        }
+
+        protected override void OnMouseUp(MouseEventArgs e)
+        {
+            base.OnMouseUp(e);
+            if (e.Button == MouseButtons.Right) ShowMenu(this, e.Location, null); // the empty area between / below the tiles
         }
 
         /// <summary>The item in use (ring).</summary>
@@ -150,7 +167,7 @@ namespace KanbanDrawer.UI.Widgets
                 SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint, true);
                 SetStyle(ControlStyles.Selectable, false); // focus stays on the list
                 Cursor = Cursors.Hand;
-                if (deletable) new ToolTip().SetToolTip(this, "クリック: 使う / Ctrl・Shift+クリック: 選ぶ / 右クリック: 削除");
+                if (deletable) new ToolTip().SetToolTip(this, "クリック: 使う / Ctrl・Shift+クリック: 選ぶ / 右クリック: 削除・削除を元に戻す");
             }
 
             public bool Selected { set { if (sel != value) { sel = value; Invalidate(); } } }

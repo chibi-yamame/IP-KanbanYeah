@@ -29,22 +29,23 @@ namespace KanbanDrawer.UI.Features
         {
             host = h;
             var p = new StackPanel();
-            p.Controls.Add(Ui.Note("クリックで看板の中央に等倍（100%）で置きます。\nCtrl / Shift+クリックで選んで、右クリック・Delete キーで削除。", 34));
+            p.Controls.Add(Ui.Note("クリックで看板の中央に等倍（100%）で置きます。", 18));
             p.Controls.Add(list);
-            p.Controls.Add(Ui.Buttons(Ui.Button("スタンプを登録...", Register), removeBg));
+            var register = Ui.Button("スタンプを登録...", Register);
+            host.Tips.SetToolTip(register, "複数の画像をまとめて選べます。320×240 より大きい画像は登録しません。");
             var del = new LibraryDelete(host, host.Stamps, list, "スタンプ", Reload);
-            p.Controls.Add(Ui.Buttons(del.DeleteButton, del.UndoButton));
-            p.Controls.Add(Ui.Note("複数の画像をまとめて選べます。320×240 より大きい画像は登録しません。", 18));
+            p.Controls.Add(del.Row(register, removeBg));
 
-            var box = new StackPanel { Height = 170, Padding = new Padding(0), AutoScroll = false };
-            box.Controls.Add(Ui.Heading("選択中のスタンプ"));
+            var box = new StackPanel { Height = 136, Padding = new Padding(0), AutoScroll = false };
+            var heading = Ui.Heading("選択中のスタンプ");
+            host.Tips.SetToolTip(heading, "プレビュー上: ドラッグで移動、角で拡縮、上の丸で回転（Shift で 15° ずつ）。");
+            box.Controls.Add(heading);
             box.Controls.Add(Ui.Row("大きさ", size));
             box.Controls.Add(Ui.Row("回転", angle));
             box.Controls.Add(Ui.Buttons(
                 Ui.Button("前面へ", () => host.Doc.Restack(current, +1)),
                 Ui.Button("背面へ", () => host.Doc.Restack(current, -1)),
                 Ui.Button("看板から削除", () => host.Doc.Remove(current))));
-            box.Controls.Add(Ui.Note("プレビュー上: ドラッグで移動、角で拡縮、上の丸で回転（Shift で 15° ずつ）。", 34));
             selectedBox = box;
             p.Controls.Add(box);
 
