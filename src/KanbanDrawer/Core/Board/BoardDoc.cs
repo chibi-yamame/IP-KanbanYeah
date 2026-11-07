@@ -81,6 +81,23 @@ namespace KanbanDrawer.Core.Board
             NotifyChanged();
         }
 
+        /// <summary>
+        /// Replaces the whole board with a saved one (or <see cref="BoardContent.Empty"/> = start anew): clears undo / redo
+        /// and the selection, raises <see cref="Changed"/> once. The quantize settings are not the document's.
+        /// </summary>
+        public void Load(BoardContent c)
+        {
+            BackgroundColor = c.BackgroundColor;
+            Frame = c.Frame;
+            FrameId = c.FrameId;
+            Objects.Clear();
+            Objects.AddRange(c.Objects);
+            undo.Clear();
+            redo.Clear();
+            Select(null);
+            NotifyChanged();
+        }
+
         /// <summary>Saves the current state for undo (clears redo).</summary>
         public void Checkpoint()
         {

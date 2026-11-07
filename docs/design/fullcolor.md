@@ -16,7 +16,7 @@
 ## 入口・流れ
 - 看板屋の起動時: `AgentLink.Start` がパイプのサーバーを作って待ち受け（入力方式に関係なく、看板屋が開いている間ずっと）。
   同時に背景で `kanban-agent.jar` を書き出し直す（内容が違うときだけ）。
-- ゲームの起動: 「InterPot を起動」ボタン、または作成したショートカット。どちらも同じコマンド（`-javaagent` 付き）。看板屋が
+- ゲームの起動: 「InterPot を起動」ボタン、または作成したショートカット（「InterPot を起動」の右の ▼ のメニュー「ショートカットを作成」で作る）。どちらも同じコマンド（`-javaagent` 付き）。看板屋が
   起動していなくてもゲームは普通に動く（エージェントは数秒おきにつなぎに行くだけ）。
 - 書き込み: 入力方式を「フルカラー（直接書き込み）」にして「描画開始」→ `MainForm.StartFullColor` が合成を RGB に直して
   `AgentLink.Put` → エージェントが `pixels` を書き換えて `OK`（[drawing.md](drawing.md)「フルカラー」）。
@@ -29,7 +29,7 @@
 | `Win/AgentLink` | パイプのサーバー（接続の待ち受け・再待ち受け・ACL）+ 手順の本体 `AgentSession`（`Stream` 1 本を相手に HELLO を読み、PUT を送って応答を読む。テストはメモリ上のストリームで行う）。`Status` と `StatusChanged` イベント（任意のスレッドから） |
 | `Win/GameLauncher` | `InterPot3.jar` の場所の決定（`LocateGame`、自動検出 `FindInstalled`）、起動、ショートカット（.lnk）作成。`JavaHelper` を使う |
 | `Win/JavaHelper` | 既存。`FindJava`（.jar を開く Java）、`Extract`（`%LOCALAPPDATA%\KanbanDrawer` へ書き出し）。`FindJavaw`（同じ場所の `javaw.exe`、無ければ `FindJava` と同じ）を足す |
-| `UI/MainForm` | 入力方式「フルカラー」、状態の行・ボタン、`StartFullColor`（[ui.md](ui.md)） |
+| `UI/MainForm` | 入力方式「フルカラー」、状態の行（色の点 + 文字、「InterPot を起動」と ▼ のメニュー「ショートカットを作成」）、使わない部品を隠す、`StartFullColor`（[ui.md](ui.md)） |
 
 `AgentLink` は Win32 の API は使わず `System.IO.Pipes`（.NET Framework 4.8 標準）だけ。純粋な手順（`AgentSession`、RGB への変換）は
 `Win/` に置くが WinForms に依存しない。
@@ -99,6 +99,7 @@ AWT のイベントスレッド以外から木を辿ってよい（読むだけ�
 既にゲームが動いていても起動する（二重起動の判定はしない。ゲーム自身の仕組みに任せる）。
 
 ### ショートカット（「ショートカットを作成」）
+入口は「InterPot を起動」の右の小さな ▼ ボタンのメニュー（独立したボタンはない。[ui.md](ui.md)）。
 デスクトップ（`Environment.SpecialFolder.DesktopDirectory`）に「InterPot3 (屋).lnk」を作る（既にあれば上書き。`GameLauncher.ShortcutName`。前の試作版の「InterPot3 (フルカラー).lnk」は触らない）。
 作成は `WScript.Shell` の COM（`Type.GetTypeFromProgID`、遅延バインド。参照の追加なし）:
 | 項目 | 値 |
@@ -166,13 +167,14 @@ AWT のイベントスレッド以外から木を辿ってよい（読むだけ�
 | 行が 256 バイトを超える | 接続を閉じる |
 
 ### 看板屋の状態（`AgentLink.Status`）
-| 状態 | 画面の表示 | 意味 |
+画面では**色の点（●）+ 文字**の 1 行（枠「描く操作」の入力方式の行の下。入力方式がフルカラーのときだけ。配置・色の値は [ui.md](ui.md)「入力方式」）。文字は今までと同じで、点の色は文字の補助（色だけに頼らない）。
+| 状態 | 画面の表示（点の色 + 文字） | 意味 |
 |---|---|---|
-| `Disconnected` | 未接続 | パイプはあるがエージェントが来ていない |
-| `Busy` | 未接続（別の看板屋が使用中） | パイプを作れなかった |
-| `NoEditor` | 接続中: エディタなし | 最後の HELLO が `none` |
-| `Editor` | 接続中: エディタあり | 最後の HELLO が `editor` |
-| `Mismatch` | 版が合いません | 版の食い違い |
+| `Disconnected` | 灰 + 未接続 | パイプはあるがエージェントが来ていない |
+| `Busy` | 赤 + 未接続（別の看板屋が使用中） | パイプを作れなかった |
+| `NoEditor` | 橙 + 接続中: エディタなし | 最後の HELLO が `none` |
+| `Editor` | 緑 + 接続中: エディタあり | 最後の HELLO が `editor` |
+| `Mismatch` | 赤 + 版が合いません | 版の食い違い |
 `Put` が使えるのは `Editor` のときだけ（それ以外は呼び出し側が理由をログに出して何もしない）。
 
 ## 看板屋側の書き込み（`MainForm.StartFullColor`）

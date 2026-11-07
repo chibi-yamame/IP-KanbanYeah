@@ -26,13 +26,15 @@ namespace KanbanDrawer.UI.Features
         {
             host = h;
             var p = new StackPanel();
-            p.Controls.Add(Ui.Note("「下書き」で使います。対象はフレーム・画像・スタンプ（背景色・文字は元の色のまま）。", 34));
-            p.Controls.Add(Ui.Row("ディザ", dither));
+            p.Controls.Add(Ui.Note("「下書き」で使います（背景色・文字は対象外）。", 18));
+            var ditherRow = Ui.Row("ディザ", dither);
+            p.Controls.Add(ditherRow);
+            host.Tips.SetToolTip(Ui.LabelOf(ditherRow), "対象はフレーム・画像・スタンプ（背景色・文字は元の色のまま）。");
+            host.Tips.SetToolTip(dither, "イラスト・文字はディザ「なし」、写真は誤差拡散がおすすめです。");
             p.Controls.Add(Ui.Row("ディザの強さ", strength));
             p.Controls.Add(Ui.Row("明るさ", brightness));
             p.Controls.Add(Ui.Row("コントラスト", contrast));
             p.Controls.Add(Ui.Row("彩度", saturation));
-            p.Controls.Add(Ui.Note("▼ を押すと元の値に戻ります。", 18));
             p.Controls.Add(Ui.Heading("使う色"));
             var grid = new TableLayoutPanel { Height = 60, ColumnCount = 5, RowCount = 2 };
             grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
@@ -46,9 +48,9 @@ namespace KanbanDrawer.UI.Features
                 cb.CheckedChanged += (s, e) => Apply();
             }
             p.Controls.Add(grid);
-            p.Controls.Add(Ui.Note("イラスト・文字はディザ「なし」、写真は誤差拡散がおすすめです。", 18));
             dither.SelectedIndexChanged += (s, e) => Apply();
             foreach (var s in new[] { strength, brightness, contrast, saturation }) s.ValueChanged += (o, e) => Apply();
+            host.QuantizeLoadRequested += ApplyOptions;
             return p;
         }
 
@@ -71,6 +73,20 @@ namespace KanbanDrawer.UI.Features
             s.Set("dither", dither.SelectedIndex);
             s.Set("strength", strength.Value);
             s.Set("colors", new string(colors.Select(c => c.Checked ? '1' : '0').ToArray()));
+        }
+
+        /// <summary>Settings from an opened board (.kanban): shows them all, then applies them once.</summary>
+        void ApplyOptions(QuantizeOptions o)
+        {
+            loading = true;
+            dither.SelectedIndex = Math.Max(0, Math.Min(3, (int)o.Dither));
+            strength.Value = (int)Math.Round(o.Strength * 100);
+            brightness.Value = o.Brightness;
+            contrast.Value = o.Contrast;
+            saturation.Value = o.Saturation;
+            for (int i = 0; i < Palette.Count; i++) colors[i].Checked = i >= o.Enabled.Length || o.Enabled[i];
+            loading = false;
+            Apply();
         }
 
         void Apply()

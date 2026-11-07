@@ -11,7 +11,8 @@
 | [locate.md](locate.md) | 看板の自動検出、ボタン位置（原作定数）、押下状態の判定 | 検出が失敗する・原作の配置が違う |
 | [drawing.md](drawing.md) | 描画セッション、入力方式（PostMessage / SendInput）、フェンス、読み戻し検証、中断 | 描画の取りこぼし・速度・安全装置 |
 | [fullcolor.md](fullcolor.md) | フルカラー直接書き込み（実験的）: ゲームに入れるエージェント（Java）、名前付きパイプの手順、ゲームの起動・`InterPot3.jar` の場所の確認・ショートカット、Ctrl+Shift+V | 10 色以外の色で書く・パイプやエージェントを変える |
-| [ui.md](ui.md) | 画面構成、設定保存、進捗表示、CLI | 画面や CLI を変える |
+| [ui.md](ui.md) | 画面構成（上の帯・左パネル・使い方）、設定保存、進捗表示、CLI | 画面や CLI を変える |
+| [boardfile.md](boardfile.md) | 看板の保存・復元（`.kanban` = ZIP）: 保存形式、検証、`BoardFile` / `BoardFileCommands`、`--board` | 保存形式・開く / 保存の挙動を変える |
 
 その他: [../SPEC.md](../SPEC.md)（仕様）、[../../README.md](../../README.md)（使い方・ビルド）。
 各節の「不変条件とテスト」に出てくる単体テスト（`…Tests`）は [../../tests/KanbanDrawer.Tests/](../../tests/KanbanDrawer.Tests/)
@@ -30,3 +31,4 @@
 入力方式「フルカラー（直接書き込み）」は別経路: 合成（減色しない）─ `AgentLink`（名前付きパイプ）─▶ ゲームの中のエージェント ─▶ `EditCanvas.pixels`
 （[fullcolor.md](fullcolor.md)）。検出・ストローク計画・描画セッションは通らない。
 `Core/` は Win32 / WinForms に依存しない（`IBoardIO` 越しに入出力）→ `tests/` の `FakeEditor` で全体を単体テストできる。
+`BoardDoc` と減色の設定は `.kanban` ファイルに保存・復元できる（`BoardFile` ─ ZIP + 本体テキスト + PNG。[boardfile.md](boardfile.md)）。画面の操作は `UI/BoardFileCommands`、CLI は `--board`。

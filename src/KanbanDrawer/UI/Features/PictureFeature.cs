@@ -31,13 +31,19 @@ namespace KanbanDrawer.UI.Features
         {
             host = h;
             var p = new StackPanel();
-            p.Controls.Add(Ui.Note("画像を看板に置きます（スタンプ・文字の後ろ）。何枚でも置けます。余白・透明部分には下地が見えます。", 34));
-            p.Controls.Add(Ui.Buttons(Ui.Button("画像を開く...", Open)));
-            p.Controls.Add(Ui.Row("置き方", fit));
-            p.Controls.Add(Ui.Note("ウィンドウへのドラッグ&ドロップでも開けます。", 18));
+            p.Controls.Add(Ui.Note("画像を看板に置きます（スタンプ・文字の後ろ、何枚でも）。", 18));
+            var open = Ui.Button("画像を開く...", Open);
+            host.Tips.SetToolTip(open, "ウィンドウへのドラッグ&ドロップでも開けます。");
+            p.Controls.Add(Ui.Buttons(open));
+            var fitRow = Ui.Row("置き方", fit);
+            p.Controls.Add(fitRow);
+            host.Tips.SetToolTip(Ui.LabelOf(fitRow), "余白・透明部分には下地が見えます。");
+            host.Tips.SetToolTip(fit, "余白・透明部分には下地が見えます。");
 
-            var box = new StackPanel { Height = 224, Padding = new Padding(0), AutoScroll = false };
-            box.Controls.Add(Ui.Heading("選択中の画像"));
+            var box = new StackPanel { Height = 190, Padding = new Padding(0), AutoScroll = false };
+            var heading = Ui.Heading("選択中の画像");
+            host.Tips.SetToolTip(heading, "プレビュー上: ドラッグで移動、角で拡縮、上の丸で回転（Shift で 15° ずつ）。");
+            box.Controls.Add(heading);
             box.Controls.Add(name);
             box.Controls.Add(Ui.Row("大きさ", size));
             box.Controls.Add(Ui.Row("回転", angle));
@@ -46,7 +52,6 @@ namespace KanbanDrawer.UI.Features
                 Ui.Button("前面へ", () => host.Doc.Restack(current, +1)),
                 Ui.Button("背面へ", () => host.Doc.Restack(current, -1)),
                 Ui.Button("看板から削除", () => host.Doc.Remove(current))));
-            box.Controls.Add(Ui.Note("プレビュー上: ドラッグで移動、角で拡縮、上の丸で回転（Shift で 15° ずつ）。", 34));
             selectedBox = box;
             p.Controls.Add(box);
 

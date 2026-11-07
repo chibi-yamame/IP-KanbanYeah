@@ -46,9 +46,12 @@ namespace KanbanDrawer.UI.Features
             font.Text = GdiTextRasterizer.DefaultFont();
 
             var p = new StackPanel();
+            p.Controls.Add(Ui.Note("10 色でにじまず描きます（フルカラーではなめらか）。", 18));
             p.Controls.Add(Ui.Row("文字の形", Ui.Buttons(official, freeFont)));
+            host.Tips.SetToolTip(official, "InterPot の文字ツールと同じ字形（10〜22px・既定 12px）。");
             p.Controls.Add(fallbackNote);
             p.Controls.Add(Ui.Row("文字", text, 56));
+            host.Tips.SetToolTip(text, "選択中の文字は、ここでの変更がすぐ反映されます。");
             p.Controls.Add(Ui.Row("フォント", font));
             var sizeRow = new FlowLayoutPanel { WrapContents = false, Height = 26 };
             size.Width = 60;
@@ -69,8 +72,6 @@ namespace KanbanDrawer.UI.Features
                 Ui.Button("背面へ", () => host.Doc.Restack(current, -1)),
                 Ui.Button("看板から削除", () => host.Doc.Remove(current)));
             p.Controls.Add(objectButtons);
-            p.Controls.Add(Ui.Note("文字は 10 色で、にじまずに描きます（フルカラーではなめらかに）。選択中の文字は、ここでの変更がすぐ反映されます。\n" +
-                "公式と同じ: InterPot の文字ツールと同じ字形（10〜22px・既定 12px）。", 50));
 
             official.CheckedChanged += (s, e) => { if (official.Checked) SwitchMode(true); };
             freeFont.CheckedChanged += (s, e) => { if (freeFont.Checked) SwitchMode(false); };
