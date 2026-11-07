@@ -58,6 +58,21 @@ namespace KanbanDrawer.UI.Features
 
         public IWin32Window Owner => Ui.FindForm();
 
+        /// <summary>
+        /// The input mode is full colour: text (except official text) is drawn smoothly (<see cref="GdiTextRasterizer.Smooth"/>).
+        /// Set by MainForm on every input-mode change; re-renders (and marks the draft stale) only when it changes.
+        /// </summary>
+        public bool FullColor
+        {
+            get => Text.Smooth;
+            set
+            {
+                if (Text.Smooth == value) return;
+                Text.Smooth = value;
+                Invalidate();
+            }
+        }
+
         /// <summary>Asks for a re-render; changes arriving before it runs are rendered together.</summary>
         public void Invalidate()
         {

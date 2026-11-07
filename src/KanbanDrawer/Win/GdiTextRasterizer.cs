@@ -11,11 +11,15 @@ namespace KanbanDrawer.Win
 {
     /// <summary>
     /// Text as GDI+ glyph outlines (GraphicsPath.AddString), filled without anti-aliasing so every pixel is either
-    /// the letter colour, the outline colour or untouched. Fonts are whatever is installed.
+    /// the letter colour, the outline colour or untouched (<see cref="Rasterize"/>), or anti-aliased into coverage
+    /// for full-colour mode (<see cref="RasterizeCoverage"/>, used while <see cref="Smooth"/>). Fonts are whatever is installed.
     /// </summary>
     public sealed class GdiTextRasterizer : ITextRasterizer, IRenderServices
     {
         public ITextRasterizer Text => this;
+
+        /// <summary>Draw text smoothly (full-colour mode). Set by EditorHost.FullColor; default false.</summary>
+        public bool Smooth { get; set; }
 
         /// <summary>Installed font families (names as GDI+ reports them, Japanese names where the font has them).</summary>
         public static string[] InstalledFonts()
@@ -53,15 +57,8 @@ namespace KanbanDrawer.Win
         public void Rasterize(TextObject t, byte[] mask, int pageW, int pageH)
         {
             if (t.Official) { RasterizeOfficial(t, mask, pageW, pageH); return; }
-            using (var path = LocalPath(t, out RectangleF b))
-            using (var m = new Matrix())
+            using (var path = PlacedPath(t))
             {
-                // local box centred on (0,0) → scale → rotate → place
-                m.Translate(-(b.X + b.Width / 2), -(b.Y + b.Height / 2), MatrixOrder.Append);
-                m.Scale((float)t.Scale, (float)t.Scale, MatrixOrder.Append);
-                m.Rotate((float)(t.Rot * 180 / Math.PI), MatrixOrder.Append);
-                m.Translate((float)t.Cx, (float)t.Cy, MatrixOrder.Append);
-                path.Transform(m);
                 using (var bmp = new Bitmap(pageW, pageH, PixelFormat.Format32bppArgb))
                 {
                     using (var g = Graphics.FromImage(bmp))
@@ -99,6 +96,81 @@ namespace KanbanDrawer.Win
                     finally { bmp.UnlockBits(data); }
                 }
             }
+        }
+
+        /// <summary>
+        /// Anti-aliased coverage (see <see cref="ITextRasterizer.RasterizeCoverage"/>): the same placed path as
+        /// <see cref="Rasterize"/> filled with AntiAlias in two passes (outline area, then letters alone) so overlapping
+        /// edges are not mixed in one image. Official text: the 2-value result as 0 / 255.
+        /// </summary>
+        public void RasterizeCoverage(TextObject t, byte[] letter, byte[] outline, int pageW, int pageH)
+        {
+            bool hasOutline = t.Outline >= 0 && t.OutlineWidth > 0;
+            if (t.Official)
+            {
+                var mask = new byte[pageW * pageH];
+                RasterizeOfficial(t, mask, pageW, pageH);
+                for (int i = 0; i < mask.Length; i++)
+                {
+                    if (mask[i] == 1) letter[i] = 255;
+                    if (mask[i] != 0 && hasOutline) outline[i] = 255;
+                }
+                return;
+            }
+            using (var path = PlacedPath(t))
+            using (var bmp = new Bitmap(pageW, pageH, PixelFormat.Format32bppArgb))
+            using (var g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.PixelOffsetMode = PixelOffsetMode.Half;
+                if (hasOutline)
+                {
+                    g.Clear(Color.Black);
+                    using (var wide = (GraphicsPath)path.Clone())
+                    using (var pen = new Pen(Color.White, (float)Math.Max(1, 2 * t.OutlineWidth * t.Scale)) { LineJoin = LineJoin.Round })
+                    {
+                        wide.Widen(pen);
+                        g.FillPath(Brushes.White, wide);
+                        g.FillPath(Brushes.White, path); // widening leaves the inside of letters open
+                    }
+                    g.Flush();
+                    ReadRed(bmp, outline, pageW, pageH);
+                }
+                g.Clear(Color.Black);
+                g.FillPath(Brushes.White, path);
+                g.Flush();
+                ReadRed(bmp, letter, pageW, pageH);
+            }
+        }
+
+        static void ReadRed(Bitmap bmp, byte[] dest, int pageW, int pageH)
+        {
+            var data = bmp.LockBits(new Rectangle(0, 0, pageW, pageH), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+            try
+            {
+                var row = new int[pageW];
+                for (int y = 0; y < pageH; y++)
+                {
+                    Marshal.Copy(data.Scan0 + y * data.Stride, row, 0, pageW);
+                    for (int x = 0; x < pageW; x++) dest[y * pageW + x] = (byte)((row[x] >> 16) & 255);
+                }
+            }
+            finally { bmp.UnlockBits(data); }
+        }
+
+        /// <summary>The text's path placed on the page: local box centred on (0,0) → scale → rotate → place.</summary>
+        static GraphicsPath PlacedPath(TextObject t)
+        {
+            var path = LocalPath(t, out RectangleF b);
+            using (var m = new Matrix())
+            {
+                m.Translate(-(b.X + b.Width / 2), -(b.Y + b.Height / 2), MatrixOrder.Append);
+                m.Scale((float)t.Scale, (float)t.Scale, MatrixOrder.Append);
+                m.Rotate((float)(t.Rot * 180 / Math.PI), MatrixOrder.Append);
+                m.Translate((float)t.Cx, (float)t.Cy, MatrixOrder.Append);
+                path.Transform(m);
+            }
+            return path;
         }
 
         /// <summary>

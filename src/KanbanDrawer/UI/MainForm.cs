@@ -19,10 +19,12 @@ namespace KanbanDrawer.UI
     internal sealed class MainForm : Form
     {
         // input modes and the cost per stroke measured on the mock board (docs/design/drawing.md)
-        static readonly (string Name, InputMode Mode, double StrokeMs)[] Modes =
+        // the third mode does not draw with the pen: the game's agent writes the composite (docs/design/fullcolor.md)
+        static readonly (string Name, InputMode? Mode, double StrokeMs)[] Modes =
         {
             ("バックグラウンド（推奨）", InputMode.Post, 2.3),
             ("マウス操作（互換・遅い）", InputMode.Send, 18),
+            ("フルカラー（直接書き込み・実験的）", null, 0),
         };
 
         const string AppTitle = "看板屋";
@@ -48,8 +50,19 @@ namespace KanbanDrawer.UI
         readonly Button stop = new Button { Text = "中止 (Esc)", Height = 28, Enabled = false };
         readonly ProgressBar bar = new ProgressBar { Height = 14 };
         readonly TextBox log = new TextBox { Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical };
+        readonly Label agentState = new Label { AutoSize = true, Anchor = AnchorStyles.Left };
+        readonly Button launchGame = new Button { Text = "InterPot を起動", AutoSize = true };
+        readonly Button makeShortcut = new Button { Text = "ショートカットを作成", AutoSize = true };
+        readonly Control agentRow;
+        readonly AgentLink agent = new AgentLink(AgentLink.DefaultPipeName());
+        AgentStatus shownAgentStatus = AgentStatus.Disconnected;
         CancellationTokenSource drawing;
+        bool writing; // a full-colour PUT waits for its answer
         ProgressOverlay overlay;
+        Action fitLog;
+
+        bool FullColor => Modes[inputMode.SelectedIndex].Mode == null;
+        bool Busy => drawing != null || writing;
 
         public MainForm(string picture = null)
         {
@@ -57,13 +70,14 @@ namespace KanbanDrawer.UI
             using (var icon = typeof(MainForm).Assembly.GetManifestResourceStream("KanbanDrawer.app.ico")) Icon = new Icon(icon);
             Font = new Font("Yu Gothic UI", 9f);
             AutoScaleMode = AutoScaleMode.Dpi;
-            ClientSize = new Size(744, 600);
-            MinimumSize = new Size(700, 540);
+            ClientSize = new Size(744, 660);
+            MinimumSize = new Size(700, 600);
             AllowDrop = true;
             KeyPreview = true;
 
             host = new EditorHost(settings, this) { Log = Log };
             view = new EditorView(host);
+            agentRow = BuildAgentRow();
             BuildLayout();
             foreach (var f in features)
             {
@@ -94,7 +108,10 @@ namespace KanbanDrawer.UI
             redo.Click += (s, e) => Redo();
             savePng.Click += (s, e) => SavePng();
             paste.Click += (s, e) => Paste();
-            inputMode.SelectedIndexChanged += (s, e) => UpdateStats();
+            inputMode.SelectedIndexChanged += (s, e) => OnInputMode();
+            launchGame.Click += (s, e) => LaunchGame(false);
+            makeShortcut.Click += (s, e) => LaunchGame(true);
+            agent.StatusChanged += () => { if (IsHandleCreated && !IsDisposed) BeginInvoke((Action)OnAgentStatus); };
             detect.Click += (s, e) => Detect();
             draw.Click += (s, e) => StartDrawing(false);
             resume.Click += (s, e) => StartDrawing(true);
@@ -102,12 +119,15 @@ namespace KanbanDrawer.UI
             DragEnter += (s, e) => e.Effect = e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None;
             DragDrop += (s, e) => { if (e.Data.GetData(DataFormats.FileDrop) is string[] f && f.Length > 0) OpenFile(f[0]); };
             KeyDown += OnKey;
-            FormClosing += (s, e) => { SaveSettings(); OfficialText.Shutdown(); };
+            FormClosing += (s, e) => { SaveSettings(); OfficialText.Shutdown(); agent.Dispose(); };
 
             host.RenderNow();
-            UpdateButtons();
-            UpdateStats();
+            OnInputMode();
+            HandleCreated += (s, e) => { agent.Start(); OnAgentStatus(); };
+            // the agent jar for the shortcut / launch, rewritten only when it differs (a missing jar is reported on use)
+            Task.Run(() => { try { GameLauncher.ExtractAgent(); } catch (Exception) { } });
             Log("画像やスタンプ・文字で看板を作り、InterPot で看板の編集画面を開いて「描画開始」。保存はご自身で。");
+            Shown += (s, e) => EnsureLogLines();
             if (picture != null) Shown += (s, e) => OpenFile(picture);
         }
 
@@ -132,6 +152,7 @@ namespace KanbanDrawer.UI
             detect.Margin = new Padding(4, 0, 0, 0);
             modeRow.Controls.Add(detect, 2, 0);
             left.Controls.Add(modeRow);
+            left.Controls.Add(agentRow);
             left.Controls.Add(draw);
             var row = new TableLayoutPanel { Height = 30, ColumnCount = 2, Margin = new Padding(0, 2, 0, 2) };
             row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 60));
@@ -149,10 +170,38 @@ namespace KanbanDrawer.UI
                 int h = Math.Max(48, left.ClientSize.Height - left.Padding.Bottom - log.Top - log.Margin.Bottom);
                 if (log.Height != h) log.Height = h;
             }
+            fitLog = FitLog;
             left.Resize += (s, e) => FitLog();
             left.HandleCreated += (s, e) => BeginInvoke((Action)FitLog);
             Controls.Add(tabs);
             Controls.Add(left);
+        }
+
+        /// <summary>
+        /// Once at start: the log shows at least 6 lines (5 in full colour, whose state row takes height). 744x660 gives that
+        /// with Yu Gothic UI 9pt; a taller font grows the window by what is missing (docs/design/ui.md「ログ欄の高さ」).
+        /// </summary>
+        void EnsureLogLines()
+        {
+            if (WindowState != FormWindowState.Normal) return;
+            fitLog?.Invoke();
+            int need = (FullColor ? 5 : 6) * log.Font.Height + 4;
+            if (log.Height < need) Height += need - log.Height;
+        }
+
+        /// <summary>Full colour only: the link's state on the left, starting the game / making its shortcut on the right.</summary>
+        Control BuildAgentRow()
+        {
+            var r = new TableLayoutPanel { Height = 30, ColumnCount = 3, Margin = new Padding(0, 2, 0, 2), Visible = false };
+            r.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            r.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            r.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            r.Controls.Add(agentState, 0, 0);
+            launchGame.Margin = new Padding(4, 0, 0, 0);
+            makeShortcut.Margin = new Padding(4, 0, 0, 0);
+            r.Controls.Add(launchGame, 1, 0);
+            r.Controls.Add(makeShortcut, 2, 0);
+            return r;
         }
 
         // ---------- editing ----------
@@ -181,7 +230,7 @@ namespace KanbanDrawer.UI
         /// </summary>
         void Paste()
         {
-            if (drawing != null) return;
+            if (Busy) return;
             ClipboardContent c;
             try { c = ClipboardContent.Read(Clipboard.GetDataObject()); }
             catch (Exception) { c = ClipboardContent.None; } // e.g. held by another application
@@ -247,8 +296,8 @@ namespace KanbanDrawer.UI
 
         void UpdateUndo()
         {
-            undo.Enabled = host.Doc.CanUndo && drawing == null;
-            redo.Enabled = host.Doc.CanRedo && drawing == null;
+            undo.Enabled = host.Doc.CanUndo && !Busy;
+            redo.Enabled = host.Doc.CanRedo && !Busy;
         }
 
         void OnKey(object sender, KeyEventArgs e)
@@ -265,6 +314,7 @@ namespace KanbanDrawer.UI
 
         void UpdateStats()
         {
+            if (FullColor) { stats.Text = "フルカラーで書き込みます（10 色に減色しません。下書きは使いません）"; return; }
             if (host.Draft == null) { stats.Text = "「下書き」で、実際に描く 10 色の絵と本数・時間を確認できます\n（描画開始でも自動で作ります）"; return; }
             if (host.DraftStale) { stats.Text = "下書きのあとに変更があります。「下書き」で作り直してください\n（描画開始でも自動で作り直します）"; return; }
             var plan = host.Plan;
@@ -297,8 +347,13 @@ namespace KanbanDrawer.UI
 
         async void StartDrawing(bool resumeFromBoard)
         {
-            if (drawing != null) return;
-            var mode = Modes[inputMode.SelectedIndex].Mode;
+            if (Busy) return;
+            if (FullColor)
+            {
+                if (!resumeFromBoard) StartFullColor();
+                return;
+            }
+            var mode = Modes[inputMode.SelectedIndex].Mode.Value;
             drawing = new CancellationTokenSource();
             var token = drawing.Token;
             UpdateButtons();
@@ -393,14 +448,115 @@ namespace KanbanDrawer.UI
 
         void UpdateButtons()
         {
-            bool busy = drawing != null;
-            draw.Enabled = resume.Enabled = makeDraft.Enabled = !busy;
-            stop.Enabled = busy;
-            detect.Enabled = !busy;
+            bool busy = Busy;
+            draw.Enabled = makeDraft.Enabled = !busy;
+            resume.Enabled = detect.Enabled = !busy && !FullColor; // full colour neither detects nor resumes
+            stop.Enabled = drawing != null;
             paste.Enabled = !busy;
             tabs.Enabled = !busy;
             view.Enabled = !busy;
             UpdateUndo();
+        }
+
+        // ---------- full colour (docs/design/fullcolor.md) ----------
+
+        const string NotConnected = "ゲームとつながっていません。「InterPot を起動」でフルカラー用に起動してください（ゲームを先に起動済みなら、一度閉じて起動し直し）";
+
+        void OnInputMode()
+        {
+            bool full = FullColor;
+            host.FullColor = full; // smooth text while writing in full colour
+            if (agentRow.Visible != full)
+            {
+                agentRow.Visible = full; // hidden = takes no height
+                agentRow.Parent?.PerformLayout();
+                fitLog?.Invoke();
+            }
+            UpdateButtons();
+            UpdateStats();
+        }
+
+        static string StatusText(AgentStatus s)
+        {
+            switch (s)
+            {
+                case AgentStatus.Busy: return "未接続（別の看板屋が使用中）";
+                case AgentStatus.NoEditor: return "接続中: エディタなし";
+                case AgentStatus.Editor: return "接続中: エディタあり";
+                case AgentStatus.Mismatch: return "版が合いません";
+                default: return "未接続";
+            }
+        }
+
+        static bool Connected(AgentStatus s) => s == AgentStatus.NoEditor || s == AgentStatus.Editor || s == AgentStatus.Mismatch;
+
+        /// <summary>On the UI thread: shows the link's state and logs connecting, disconnecting and a version mismatch (once).</summary>
+        void OnAgentStatus()
+        {
+            var now = agent.Status;
+            var was = shownAgentStatus;
+            shownAgentStatus = now;
+            agentState.Text = StatusText(now);
+            if (now == was) return;
+            if (now == AgentStatus.Mismatch)
+                Log($"ゲーム側の連携プログラムの版（{agent.AgentVersion}）が看板屋と合いません。「InterPot を起動」で起動し直してください");
+            else if (Connected(now) && !Connected(was))
+                Log("ゲームの連携プログラムとつながりました");
+            else if (!Connected(now) && Connected(was))
+                Log("ゲームとの接続が切れました");
+        }
+
+        /// <summary>「InterPot を起動」/「ショートカットを作成」, InterPot3.jar from the setting, the auto-detected install or a dialog (then saved).</summary>
+        void LaunchGame(bool shortcut)
+        {
+            string configured = settings.Get("fullcolor.jar", "");
+            string jar = GameLauncher.LocateGame(configured, this);
+            if (jar == null) { Log("InterPot3.jar が見つかりません"); return; }
+            // only a path picked in the dialog is saved; an auto-detected one is looked up again each time
+            if (jar != configured && jar != GameLauncher.FindInstalled()) settings.Set("fullcolor.jar", jar);
+            if (shortcut) GameLauncher.CreateShortcut(jar, Log);
+            else GameLauncher.Launch(jar, Log);
+        }
+
+        /// <summary>
+        /// 描画開始 in full colour: the composite's RGB as it is (no draft, no quantization) to the agent. No countdown,
+        /// detection or Esc watch; drawing and editing are off while the answer is awaited (at most 10 s).
+        /// </summary>
+        async void StartFullColor()
+        {
+            switch (agent.Status)
+            {
+                case AgentStatus.Editor: break;
+                case AgentStatus.NoEditor: Log("InterPot で看板の編集画面を開いてください"); return;
+                case AgentStatus.Busy: Log("別の看板屋が使用中です"); return;
+                case AgentStatus.Mismatch: Log("連携プログラムの版が合いません"); return;
+                default: Log(NotConnected); return;
+            }
+            writing = true;
+            UpdateButtons();
+            try
+            {
+                host.RenderNow(); // the composite as it is now
+                var rgb = AgentLink.ToRgb(host.Composite);
+                switch (await Task.Run(() => agent.Put(rgb)))
+                {
+                    case PutResult.Ok: Log("フルカラーで書き込みました。看板を確認して、「保存」はご自身で押してください。"); break;
+                    case PutResult.NoEditor: Log("エディタが閉じられたため書き込めませんでした"); break;
+                    case PutResult.Error: Log("ゲームがエラーを返しました: " + agent.LastError); break;
+                    case PutResult.Timeout: Log("ゲームが応答しません（接続を切りました）"); break;
+                    case PutResult.NotReady: Log(NotConnected); break;
+                    // Lost: the status change logs 「ゲームとの接続が切れました」
+                }
+            }
+            catch (Exception e)
+            {
+                Log("エラー: " + e.Message);
+            }
+            finally
+            {
+                writing = false;
+                UpdateButtons();
+            }
         }
 
         void Log(string s) => log.AppendText(DateTime.Now.ToString("HH:mm:ss ") + s + Environment.NewLine);

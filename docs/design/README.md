@@ -10,6 +10,7 @@
 | [strokes.md](strokes.md) | ストローク計画: CLR 色の選択、色順の貪欲法、重ね塗りによるラン延長、縦横の選択 | 描く本数を減らす・順序を変える |
 | [locate.md](locate.md) | 看板の自動検出、ボタン位置（原作定数）、押下状態の判定 | 検出が失敗する・原作の配置が違う |
 | [drawing.md](drawing.md) | 描画セッション、入力方式（PostMessage / SendInput）、フェンス、読み戻し検証、中断 | 描画の取りこぼし・速度・安全装置 |
+| [fullcolor.md](fullcolor.md) | フルカラー直接書き込み（実験的）: ゲームに入れるエージェント（Java）、名前付きパイプの手順、ゲームの起動・`InterPot3.jar` の場所の確認・ショートカット、Ctrl+Shift+V | 10 色以外の色で書く・パイプやエージェントを変える |
 | [ui.md](ui.md) | 画面構成、設定保存、進捗表示、CLI | 画面や CLI を変える |
 
 その他: [../SPEC.md](../SPEC.md)（仕様）、[../../README.md](../../README.md)（使い方・ビルド）。
@@ -26,4 +27,6 @@
                                                                                      │  ▲
                                                 InputDriver (PostMessage / SendInput) ┘  └ 読み戻し（ScreenCapture）
 ```
+入力方式「フルカラー（直接書き込み）」は別経路: 合成（減色しない）─ `AgentLink`（名前付きパイプ）─▶ ゲームの中のエージェント ─▶ `EditCanvas.pixels`
+（[fullcolor.md](fullcolor.md)）。検出・ストローク計画・描画セッションは通らない。
 `Core/` は Win32 / WinForms に依存しない（`IBoardIO` 越しに入出力）→ `tests/` の `FakeEditor` で全体を単体テストできる。

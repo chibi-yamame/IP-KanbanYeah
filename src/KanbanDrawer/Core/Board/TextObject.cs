@@ -2,7 +2,10 @@ using System;
 
 namespace KanbanDrawer.Core.Board
 {
-    /// <summary>Turns text into pixel masks without anti-aliasing (implemented with GDI+ on Windows).</summary>
+    /// <summary>
+    /// Turns text into pixel masks: 2-value masks without anti-aliasing (<see cref="Rasterize"/>) or anti-aliased coverage
+    /// (<see cref="RasterizeCoverage"/>, for full-colour mode). Implemented with GDI+ on Windows.
+    /// </summary>
     public interface ITextRasterizer
     {
         /// <summary>Size of the text's box at Scale 1 (outline included).</summary>
@@ -13,10 +16,19 @@ namespace KanbanDrawer.Core.Board
         /// 0 = untouched.
         /// </summary>
         void Rasterize(TextObject t, byte[] mask, int pageW, int pageH);
+
+        /// <summary>
+        /// Anti-aliased coverage 0..255 (0 = untouched, 255 = fully covered) written into two page-size arrays (row major,
+        /// zeroed by the caller): <paramref name="letter"/> = the letters, <paramref name="outline"/> = the area including
+        /// the outline (255 under the letters too; all 0 without an outline or with width 0). Same transform as
+        /// <see cref="Rasterize"/>. For <see cref="TextObject.Official"/> the 2-value result (0 / 255).
+        /// </summary>
+        void RasterizeCoverage(TextObject t, byte[] letter, byte[] outline, int pageW, int pageH);
     }
 
     /// <summary>
-    /// Text in palette colours only: pixels are fixed (never dithered), so letters stay crisp at 1 px.
+    /// Text in palette colours only: pixels are fixed (never dithered), so letters stay crisp at 1 px. With
+    /// <see cref="IRenderServices.Smooth"/> (full-colour mode) non-official text is blended by coverage instead (free pixels).
     /// LocalW/H come from the rasterizer (<see cref="Measure"/> after every change of text, font, size, outline).
     /// </summary>
     public sealed class TextObject : BoardObject
@@ -61,12 +73,29 @@ namespace KanbanDrawer.Core.Board
         public override void Render(Composite target, IRenderServices services)
         {
             if (string.IsNullOrEmpty(Text) || services?.Text == null) return;
+            if (services.Smooth && !Official) { RenderSmooth(target, services.Text); return; }
             var mask = new byte[target.Width * target.Height];
             services.Text.Rasterize(this, mask, target.Width, target.Height);
             for (int i = 0; i < mask.Length; i++)
             {
                 if (mask[i] == 1) target.SetFixed(i, Color);
                 else if (mask[i] == 2 && Outline >= 0) target.SetFixed(i, Outline);
+            }
+        }
+
+        /// <summary>Full-colour mode: outline first, then the letters over it, blended by coverage (pixels become free).</summary>
+        void RenderSmooth(Composite target, ITextRasterizer text)
+        {
+            int n = target.Width * target.Height;
+            var letter = new byte[n];
+            var outline = new byte[n];
+            text.RasterizeCoverage(this, letter, outline, target.Width, target.Height);
+            var fg = Palette.All[Color];
+            var oc = Outline >= 0 ? Palette.All[Outline] : null;
+            for (int i = 0; i < n; i++)
+            {
+                if (oc != null && outline[i] > 0) target.Blend(i, oc.R, oc.G, oc.B, outline[i] / 255.0);
+                if (letter[i] > 0) target.Blend(i, fg.R, fg.G, fg.B, letter[i] / 255.0);
             }
         }
     }

@@ -27,6 +27,11 @@
     <EmbeddedResource Include="Resources/kanban-text.jar" LogicalName="KanbanDrawer.kanban-text.jar" />
   </ItemGroup>
 
+  <!-- full colour: the agent loaded into the game with -javaagent (Java/KanbanAgent.java, tools/agentjar.sh) -->
+  <ItemGroup>
+    <EmbeddedResource Include="Resources/kanban-agent.jar" LogicalName="KanbanDrawer.kanban-agent.jar" Condition="Exists('Resources/kanban-agent.jar')" />
+  </ItemGroup>
+
   <!-- the window / taskbar icon (the same file is the exe's icon); app.ico is rendered from the vector source app.svg -->
   <ItemGroup>
     <EmbeddedResource Include="app.ico" LogicalName="KanbanDrawer.app.ico" />

@@ -12,6 +12,7 @@ namespace KanbanDrawer.Tests
     internal sealed class BlockText : ITextRasterizer, IRenderServices
     {
         public ITextRasterizer Text => this;
+        public bool Smooth => false;
 
         public void Measure(TextObject t, out double width, out double height)
         {
@@ -29,6 +30,17 @@ namespace KanbanDrawer.Tests
                     if (Math.Abs(lx) <= hw && Math.Abs(ly) <= hh) mask[y * w + x] = 1;
                     else if (t.Outline >= 0 && Math.Abs(lx) <= hw + 1 && Math.Abs(ly) <= hh + 1) mask[y * w + x] = 2;
                 }
+        }
+
+        public void RasterizeCoverage(TextObject t, byte[] letter, byte[] outline, int w, int h)
+        {
+            var mask = new byte[w * h];
+            Rasterize(t, mask, w, h);
+            for (int i = 0; i < mask.Length; i++)
+            {
+                if (mask[i] == 1) letter[i] = 255;
+                if (mask[i] != 0 && t.Outline >= 0) outline[i] = 255;
+            }
         }
     }
 
