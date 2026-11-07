@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows.Forms;
 using KanbanDrawer.Core;
+using KanbanDrawer.Core.Board;
 using KanbanDrawer.UI;
 using KanbanDrawer.Win;
 
@@ -33,6 +34,8 @@ namespace KanbanDrawer
     ///                    [--save-quantized out.png] [--log file]
     ///   KanbanYeah.exe --detect [--log file]
     ///   KanbanYeah.exe --quantize pic.png --save-quantized out.png [options]
+    ///   KanbanYeah.exe --board file.kanban [--no-draw] [draw options] [--save-quantized out.png]
+    ///                    (a saved board, quantized with its own settings; --no-draw stops after the plan)
     ///   KanbanYeah.exe --register-stamp pic.png [--remove-bg]                  (adds to the stamp library)
     ///   KanbanYeah.exe [--fit ...] --register-frame pic.png [--remove-bg]      (adds to the frame library)
     /// Settings and libraries live in %APPDATA%\KanbanDrawer, or in the folder named by KANBANDRAWER_DATA.
@@ -47,8 +50,8 @@ namespace KanbanDrawer
         {
             AttachConsole(-1);
             try { Console.OutputEncoding = new UTF8Encoding(false); } catch { }
-            string draw = null, quantize = null, saveQ = null, logPath = null;
-            bool detect = false;
+            string draw = null, quantize = null, board = null, saveQ = null, logPath = null;
+            bool detect = false, noDraw = false;
             var fit = FitMode.Contain;
             var q = new QuantizeOptions();
             var set = new DrawSettings();
@@ -64,6 +67,8 @@ namespace KanbanDrawer
                     {
                         case "--draw": draw = Next(); break;
                         case "--quantize": quantize = Next(); break;
+                        case "--board": board = Next(); break;
+                        case "--no-draw": noDraw = true; break;
                         case "--detect": detect = true; break;
                         case "--compare": return Compare(Next(), Next());
                         case "--dotfont-dump": return DotFontDump(Next(), Next(), Next());
@@ -94,16 +99,24 @@ namespace KanbanDrawer
                     Log(b == null ? err : $"origin={b.Origin.X},{b.Origin.Y} window=\"{b.WindowTitle}\"");
                     return b == null ? 3 : 0;
                 }
-                string src = draw ?? quantize ?? throw new ArgumentException("--draw, --quantize or --detect is required");
                 IndexedImage target;
-                using (var bmp = ImageLoader.Load(src))
-                    target = Quantizer.Quantize(ImageLoader.Fit(bmp, fit), q);
+                if (board != null)
+                {
+                    target = LoadBoard(board);
+                    if (target == null) return 3;
+                }
+                else
+                {
+                    string src = draw ?? quantize ?? throw new ArgumentException("--draw, --board, --quantize or --detect is required");
+                    using (var bmp = ImageLoader.Load(src))
+                        target = Quantizer.Quantize(ImageLoader.Fit(bmp, fit), q);
+                }
                 if (saveQ != null)
                     using (var outBmp = ImageLoader.ToBitmap(target.ToRaster()))
                         outBmp.Save(saveQ, System.Drawing.Imaging.ImageFormat.Png);
                 var plan = StrokePlanner.PlanFull(target);
                 Log($"plan: CLR={(plan.ClearColor >= 0 ? Palette.All[plan.ClearColor].Name : "-")} passes={plan.Passes.Count} strokes={plan.StrokeCount}");
-                if (draw == null) return 0;
+                if ((draw == null && board == null) || noDraw) return 0;
 
                 var result = DrawRunner.Run(target, plan, set, mode, countdown, Log,
                     new Progress<DrawProgress>(p => { }));
@@ -119,8 +132,43 @@ namespace KanbanDrawer
             }
             finally
             {
+                OfficialText.Shutdown();
                 logFile?.Dispose();
             }
+        }
+
+        /// <summary>
+        /// A saved board (--board): composited with pen text (not smooth), quantized with the file's settings. Null after
+        /// logging the error when the file cannot be opened (missing, corrupt, newer format).
+        /// </summary>
+        static IndexedImage LoadBoard(string path)
+        {
+            var text = new GdiTextRasterizer { Smooth = false };
+            BoardContent content;
+            try
+            {
+                var installed = new System.Collections.Generic.HashSet<string>(GdiTextRasterizer.InstalledFonts());
+                string fallback = null;
+                using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
+                    content = BoardFile.Read(fs, new PngCodec(), text,
+                        n => installed.Contains(n) ? n : fallback ?? (fallback = GdiTextRasterizer.DefaultFont()));
+            }
+            catch (BoardFileException e)
+            {
+                Log("error: " + e.Message);
+                return null;
+            }
+            catch (Exception e) when (e is IOException || e is UnauthorizedAccessException || e is ArgumentException
+                                      || e is NotSupportedException)
+            {
+                Log("error: ファイルを開けません: " + e.Message);
+                return null;
+            }
+            foreach (var w in content.Warnings) Log("warning: " + w);
+            var doc = new BoardDoc();
+            doc.Load(content);
+            Log($"board: objects={doc.Objects.Count} frame={(doc.Frame != null ? "yes" : "no")}");
+            return Quantizer.Quantize(Compositor.Build(doc, text), content.Quantize);
         }
 
         /// <summary>

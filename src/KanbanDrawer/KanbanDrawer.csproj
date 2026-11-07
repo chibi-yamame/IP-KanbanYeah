@@ -22,6 +22,11 @@
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
   </ItemGroup>
 
+  <!-- .kanban files are ZIP (Core/Board/BoardFile.cs) -->
+  <ItemGroup>
+    <Reference Include="System.IO.Compression" />
+  </ItemGroup>
+
   <!-- 公式と同じ text: the program's renderer, run with the Java that opens .jar files (Java/KanbanText.java, tools/textjar.sh) -->
   <ItemGroup>
     <EmbeddedResource Include="Resources/kanban-text.jar" LogicalName="KanbanDrawer.kanban-text.jar" />
