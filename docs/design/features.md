@@ -21,7 +21,7 @@
 - **編集中**: `Doc.Changed` → `EditorHost.Invalidate()`。再描画はメッセージループ 1 周に 1 回だけ（`BeginInvoke` でまとめる）。
   `CompositeCache.Build`（下地の層をキャッシュし、その複製にオブジェクトだけ描く）→ `Rendered` → `EditorView` が
   フルカラーで表示。減色も本数計算もしない（1 フレーム数 ms）。
-- **下書き**（左の「下書き」ボタン / 「下書き（10 色）」表示 / 描画開始 / PNG 保存）: `MakeDraft()` = `Quantizer.Quantize(composite)` →
+- **下書き**（左の「下書きを作る」ボタン / 「下書き（10 色）」表示 / 描画開始 / 上の帯の「PNG に書き出す」）: `MakeDraft()` = `Quantizer.Quantize(composite)` →
   `Draft`、250ms 後にバックグラウンドで `StrokePlanner.PlanFull` → `Plan`（統計表示）。`DraftChanged` で通知。
 - 下書きの後に編集すると `DraftStale`（表示はカラーに戻り、統計は「作り直してください」）。描画開始は必ず最新の下書きを描く
   （古ければその場で作る）。下書き表示中に「減色」タブを変えると、その場で下書きを作り直す（`SetQuantize` → `QuantizeChanged`）。
@@ -32,7 +32,8 @@
 ### Core（`Core/Board/`、純粋 C#）
 | クラス | 役割 |
 |---|---|
-| `BoardDoc` | 下地（`BackgroundColor` / `Frame`〔`Raster`、320x240 ARGB〕+ `FrameId`。背景色とフレームは独立）、`Objects`（z 順。`Picture` と画像の層はない）、`Selected`、スナップショット undo/redo（50）、`Changed` / `SelectionChanged`。`Add` / `Remove` / `Restack` / `HitTest`、`Compositor` |
+| `BoardDoc` | 下地（`BackgroundColor` / `Frame`〔`Raster`、320x240 ARGB〕+ `FrameId`。背景色とフレームは独立）、`Objects`（z 順。`Picture` と画像の層はない）、`Selected`、スナップショット undo/redo（50）、`Changed` / `SelectionChanged`。`Add` / `Remove` / `Restack` / `HitTest`、`Compositor`。`Load(BoardContent)` = 保存した看板（または空の看板）に丸ごと入れ替え、履歴・選択を空にして `Changed` を 1 回（[boardfile.md](boardfile.md)） |
+| `BoardFile` / `BoardContent` / `IImageCodec` | 看板の保存・復元（`.kanban` = ZIP + 本体テキスト + PNG）。読み書きと検証は `Core`、PNG の符号化・復号だけ `IImageCodec`（Win の `PngCodec`）。詳細は [boardfile.md](boardfile.md) |
 | `BoardObject` | 中心・倍率（縦横共通）・回転（ラジアン、時計回り）、ローカル⇔ページ変換、角、当たり判定、倍率の制限（長辺 4〜2000px） |
 | `ImageObject`（基底） | 画像を表すオブジェクトの共通部分。画素（ARGB、複製間で共有）。縮小時は表示サイズに面積平均で縮めたコピー（サイズごとにキャッシュ）から 1 点の双線形補間で自由層に合成。透明部分はクリックで拾わない |
 | `StampObject` | `ImageObject` の派生。ライブラリ id を持つ。画素はライブラリから読む |
@@ -77,24 +78,51 @@ interface IAcceptsPaste                                  // 貼り付け（ク�
 - 設定キーは Feature ごとに接頭辞（`frame.` `stamp.` `text.` `picture.`〔`picture.fit` = 置き方〕。減色は初版からの `dither` 等）。
 - 部品: `ResetSlider`（Windows 標準の TrackBar、1 刻み・吸着なし。上に ▼ = 既定値に戻す（位置は TBM_GETCHANNELRECT /
   TBM_GETTHUMBRECT から計算）、左右に －／＋（1 ずつ、押し続けると連続）、値は右の固定幅欄）、`PaletteSwatches`（10 色、
-  「なし」付きも可）、`ThumbnailList`（タイル一覧。Ctrl+クリックで選択の切り替え、Shift+クリックで範囲、Ctrl+A ですべて。Ctrl / Shift 付きは「使う」をしない。選択中は半透明の青 + ✓、使用中の青い枠とは別。右クリック・Delete で削除）、`LibraryDelete`（スタンプ・下地共通の「選んだものを削除」「削除を元に戻す」とログ。確認ダイアログは出さない）、`StackPanel` / `Ui.Row` 等。
+  「なし」付きも可）、`ThumbnailList`（タイル一覧。Ctrl+クリックで選択の切り替え、Shift+クリックで範囲、Ctrl+A ですべて。Ctrl / Shift 付きは「使う」をしない。選択中は半透明の青 + ✓、使用中の青い枠とは別。Delete で削除。**右クリックでメニュー**: 「削除」〔選択が複数なら「削除（n 個）」〕と「削除を元に戻す」〔戻せるものが無いときは無効〕。タイルの無い所の右クリックは「削除を元に戻す」だけ。
+  イベント `DeleteRequested` と `RestoreRequested`）、`LibraryDelete`（スタンプ・下地共通。「選んだものを削除」ボタン〔何も選んでいなければ無効、選ぶと `選んだものを削除（n）`〕と、右クリックの「削除を元に戻す」〔`ThumbnailList.RestoreRequested`〕とログ。
+  「削除を元に戻す」ボタンは無い〔M12 で右クリックのメニューへ〕。確認ダイアログは出さない。ボタンは各タブの「登録...」の行の右端に置く）、`StackPanel` / `Ui.Row` 等。
 - `EditorView`: 1 倍表示 + 周囲 10px の余白（看板の端のハンドルも掴める）。クリック = 最前面を選択、ドラッグ = 移動、角 = 拡縮、
   丸 = 回転、矢印 = 1px（Shift 10px）、Delete = 削除、Esc = 選択解除。表示はフルカラー（編集中）か下書き（10 色、`ShowDraft`。最新の下書きがあるときだけ）。
-- 描画（検出・入力方式・開始・続きから・中止・進捗・ログ）、下書き・表示切替、undo/redo・PNG 保存は Feature ではなく `MainForm` 常設。
+- 描画（検出・入力方式・開始〔描画中は赤い中止〕・続きから・進捗・ログ）、下書きを作る・表示切替、上の帯（新規・開く・保存・元に戻す・やり直し・貼り付け・PNG に書き出す・使い方）は Feature ではなく
+  `MainForm` 常設（[ui.md](ui.md)）。看板の保存・復元の処理は `UI/BoardFileCommands`（[boardfile.md](boardfile.md)）。
+- 各タブの説明文は 1 行まで。共有の `ToolTip`（`EditorHost.Tips`）に詳しい説明を付け、操作方法は「使い方」ウィンドウへ（下の「各タブの説明文」）。
 - `EditorHost` の主な API: `Invalidate()` / `RenderNow()`、`Composite`、`MakeDraft()` / `Draft` / `DraftStale` / `Plan` /
   `EnsureDraftAsync()`、`SetQuantize(opts)`、`FullColor`（入力方式がフルカラーか。`MainForm` が入力方式の変更ごとに設定する。下の「フルカラーモードの文字」）、イベント `Rendered` / `DraftChanged` / `QuantizeChanged`。
+  M12 で足すもの: `Tips`（共有の `ToolTip`。各 Feature が `host.Tips.SetToolTip(control, 文)` で説明を付ける）、`ApplyQuantize(QuantizeOptions)` と
+  イベント `QuantizeLoadRequested`（保存した看板の減色の設定を減色タブに反映する。下の「減色」。[boardfile.md](boardfile.md)）。
 
 ## 各 Feature
 | タブ | できること |
 |---|---|
 | 画像 | 開く（ボタン / ドロップ / 貼り付け / exe への引数。貼り付けは `IAcceptsPaste.PasteImage`、名前「クリップボード」）→ `PictureObject` を最背面に置いて選択、置き方（全体を収める〔既定〕/ トリミングして埋める / 等倍）。選択中: 大きさ 1〜400%（100% = 読み込んだ画素の等倍）・回転 ±180°・看板に合わせる（今の置き方で置き直す）・前面へ・背面へ・看板から削除。画像を選ぶとこのタブに切り替わる（`Owns`） |
-| 下地 | 背景色（10 色、常に有効）とフレーム一覧（「なし」+ 登録済み）を別々に選ぶ。登録（ファイル →「背景を消す」〔既定オフ、設定キー `frame.removeBg`、`StampPrep.RemoveBackground` でスタンプと同じ処理、切り詰めなし〕→ 合わせ方（既定: トリミングして埋める）で 320x240 に配置（アルファはそのまま）→ フルカラーのまま保存。減色は下書きで。「全体を収める」の余白は透明）。削除は複数選択・Delete・右クリック・「選んだものを削除」・「削除を元に戻す」（スタンプと共通） |
-| スタンプ | 一覧（クリックで中央に等倍で置く。複数選択・削除・「削除を元に戻す」は下地と共通、元画像の 1 画素 = 看板の 1 画素 = 100%）、登録（複数選択可、背景を消す〔既定オフ〕、切り詰め後 320×240 を超えるものは登録せず一覧で知らせる）、選択中: 大きさ 5〜400%・回転 ±180°・前面へ・背面へ・看板から削除 |
+| 下地 | 背景色（10 色、常に有効）とフレーム一覧（「なし」+ 登録済み）を別々に選ぶ。登録（ファイル →「背景を消す」〔既定オフ、設定キー `frame.removeBg`、`StampPrep.RemoveBackground` でスタンプと同じ処理、切り詰めなし〕→ 合わせ方（既定: トリミングして埋める）で 320x240 に配置（アルファはそのまま）→ フルカラーのまま保存。減色は下書きで。「全体を収める」の余白は透明）。削除は複数選択・Delete・右クリックの「削除」・「選んだものを削除」ボタン（「登録...」の行の右端）、右クリックの「削除を元に戻す」（スタンプと共通） |
+| スタンプ | 一覧（クリックで中央に等倍で置く。複数選択・削除・右クリックの「削除を元に戻す」は下地と共通、元画像の 1 画素 = 看板の 1 画素 = 100%）、登録（複数選択可、背景を消す〔既定オフ〕、切り詰め後 320×240 を超えるものは登録せず一覧で知らせる）、選択中: 大きさ 5〜400%・回転 ±180°・前面へ・背面へ・看板から削除 |
 | 文字 | 文字の形: **公式と同じ（ドット文字）** / フォントを選ぶ（入力方式がフルカラーのあいだはなめらか〔アンチエイリアス〕に描く）。文字（複数行可）・サイズ（公式 10〜22px / 自由 6〜200px、モードごとに記憶）・太字（自由のみ）・色・縁取り（なし / 10 色）・縁の幅 1〜5・回転（自由のみ）・文字を追加。選択中の文字には即反映。貼り付け（`IAcceptsPaste.PasteText`）= 貼ったテキストを今の設定で追加 |
-| 減色 | ディザ・強さ・明るさ・コントラスト・彩度（▼ で戻す）・使う色 |
+| 減色 | ディザ・強さ・明るさ・コントラスト・彩度（▼ で戻す）・使う色。保存した看板を開くと、その減色の設定が反映される（`ApplyOptions`、下） |
+
+**減色タブへの反映**（看板を開く、[boardfile.md](boardfile.md)）: `QuantizeFeature` は `CreatePanel` で `host.QuantizeLoadRequested` を購読し、`ApplyOptions(QuantizeOptions o)` を呼ぶ。
+`loading = true` の間にディザ（`DitherKind` → コンボの番号）・強さ（`Strength × 100`）・明るさ・コントラスト・彩度・使う色（`Enabled`）のコントロールを `o` に合わせ、`loading = false` にして `Apply()` を 1 回呼ぶ
+（= `host.SetQuantize`、`QuantizeChanged`）。`Load(Settings)` と同じ「コントロールに入れてから 1 回 `Apply`」の形。`o.Enabled` が全部偽のときは無視する（`Apply` と同じ「1 つ以上選ぶ」の規則）。
+
+## 各タブの説明文（M12）
+各タブに残す説明文は**1 行まで**（約 32 文字以内。タブの幅 約 370px）。それ以上は共有の `ToolTip`（`host.Tips`）に付けるか、「使い方」ウィンドウ（[ui.md](ui.md)）に書く。
+操作方法（ドラッグで移動・角で拡縮・Shift で 15° など）は「使い方」に集める。**今までの文は次のどこかに必ず残る**:
+
+| タブ | 1 行に残す文 | 今までの文 → 行き先 |
+|---|---|---|
+| 下地 | フレームの下（「合わせ方」の下）に `登録時に 320×240 にして保存します。` | 「フレームの透明部分や、何も置いていない所に見える色です。」→ 背景色の見出し・色の ToolTip。「色は下書きのときに、画像・スタンプと一緒に 10 色にします。透明な部分（『全体を収める』の余白も）は透明のまま残ります。」→ フレームの一覧と「合わせ方」の ToolTip、「使い方」のライブラリ。「Ctrl / Shift+クリックで選んで、右クリック・Delete キーで削除できます。」→ `ThumbnailList` の ToolTip（既存）、「使い方」のライブラリ |
+| 画像 | `画像を看板に置きます（スタンプ・文字の後ろ、何枚でも）。`（先頭の 1 行。「画像を開く...」の上） | 「余白・透明部分には下地が見えます。」→ 「置き方」の ToolTip、「使い方」。「ウィンドウへのドラッグ&ドロップでも開けます。」→ 「画像を開く...」の ToolTip、「使い方」。「プレビュー上: ドラッグで移動、角で拡縮、上の丸で回転（Shift で 15° ずつ）。」→ 「選択中の画像」の見出しの ToolTip、「使い方」の「看板の上の操作」 |
+| スタンプ | `クリックで看板の中央に等倍（100%）で置きます。`（先頭の 1 行） | 「Ctrl / Shift+クリックで選んで、右クリック・Delete キーで削除。」→ `ThumbnailList` の ToolTip（既存の「クリック: 使う / Ctrl・Shift+クリック: 選ぶ / 右クリック: 削除」に「右クリック: 削除・削除を元に戻す」の形で更新）、「使い方」。「複数の画像をまとめて選べます。320×240 より大きい画像は登録しません。」→ 「スタンプを登録...」の ToolTip、「使い方」。選択中の「プレビュー上: ドラッグで移動…」→ 「選択中のスタンプ」の見出しの ToolTip、「使い方」 |
+| 文字 | `10 色でにじまず描きます（フルカラーではなめらか）。`（先頭の 1 行） | 「選択中の文字は、ここでの変更がすぐ反映されます。」→ 文字の入力欄の ToolTip、「使い方」。「公式と同じ: InterPot の文字ツールと同じ字形（10〜22px・既定 12px）。」→ 「公式と同じ（ドット文字）」の選択肢の ToolTip |
+| 減色 | `「下書き」で使います（背景色・文字は対象外）。`（先頭の 1 行） | 「対象はフレーム・画像・スタンプ」→ 見出し代わりのディザ行の ToolTip。「▼ を押すと元の値に戻ります。」→ 既存の ▼ の ToolTip（`ResetSlider`）があるので文は消す。「イラスト・文字はディザ『なし』、写真は誤差拡散がおすすめです。」→ ディザのコンボの ToolTip、「使い方」 |
+- 説明文の行（`Ui.Note`）は 1 行の高さ（18）にそろえる。消えた分の高さは、そのタブの下側の余白になる（タブの中身は上から積む。見た目の隙間のための調整はしない）。
+- 「使い方」の文章は [ui.md](ui.md)「使い方」ウィンドウに全文がある。
+
+**ライブラリの行**（下地・スタンプ）: 「登録...」のボタン、「背景を消す」のチェック、右端に「選んだものを削除」（`LibraryDelete.DeleteButton`。右寄せ。`TableLayoutPanel` の 4 列目、3 列目が伸びる）を同じ 1 行に置く。
+今までの「削除を元に戻す」ボタンの行はなくなる（その行の高さ分、一覧の下が詰まる）。
 
 ## クリップボードから貼り付け
-Ctrl+V・「貼り付け」ボタン（[ui.md](ui.md)）で、クリップボードの画像・テキストを看板に置く。読み取りは `MainForm`、置くのは各 Feature。
+Ctrl+V・上の帯の「貼り付け」（[ui.md](ui.md)）で、クリップボードの画像・テキストを看板に置く。読み取りは `MainForm`、置くのは各 Feature。
 
 - **読み取り**（`Win/ClipboardContent`）: `ClipboardContent.Read(IDataObject)` が、上から順に最初に見つかった 1 種類だけを返す
   （`Kind` = `None` / `Files` / `Image` / `Text`）。`Clipboard.GetDataObject()` は `MainForm` が呼び、`Read` は `DataObject` を渡せば
@@ -149,7 +177,7 @@ Ctrl+V・「貼り付け」ボタン（[ui.md](ui.md)）で、クリップボー
   ② 字の面だけ → R チャンネル = `letter`。`Official` は 2 値の `RasterizeOfficial` の結果から作る。測る箱（`Measure`）は変えない（AA の薄い縁は箱の外に 1 画素出うる。ページの範囲で切るだけ）。
 - **2 値の道は残す**: `Smooth` が false（テスト・ペンの入力方式・`Bench`・既定）なら今までと画素単位で同じ（固定・2 値・下書きは 10 色にそのまま）。
   ペンの入力方式に戻したら `FullColor = false` で再描画され、文字は固定・2 値に戻る。下書き（10 色）の文字がにじまないのはこの道の性質。
-- フルカラーモード中の「下書き」表示はなめらかな文字を減色したもの（書き込みには使わない。ペンの下書きと同じ見た目ではない）。
+- フルカラーモード中は、下書きの作成と表示の切り替えを画面から隠す（書き込みには使わない。[ui.md](ui.md)）。「PNG に書き出す」で作る下書きは、なめらかな文字を減色したもの（ペンの下書きと同じ見た目ではない）。
 - 文字の見た目の設定（太さ・縁の幅・色）は同じ。AA の縁取り（幅 1）は 2 値より細く見えるので、必要なら縁の幅を上げる。
 
 ## 公式と同じ文字（`TextObject.Official`、`Win/OfficialText`）
@@ -181,7 +209,8 @@ Ctrl+V・「貼り付け」ボタン（[ui.md](ui.md)）で、クリップボー
 - 透明は下地、文字は固定色 + 縁取り: `CompositorTests`
 - 画像オブジェクト（置き方 3 種の倍率と位置、長辺 1280px への縮小、最背面に入る・undo で戻る、透明部分は拾わない、スタンプは従来通り）: `PictureTests`
 - フレーム（ライブラリを往復してもフルカラー・アルファのまま、合成で透明の所は背景色・半透明は背景色と混ざる、画素は自由で下書きで減色・ディザされる、背景色の変更で基礎層が作り直される、前の版の 10 色フレームも読める、背景を消すと縁の色の領域が透明になる）: `FrameTests`
-- ライブラリの削除（まとめて削除 → 元に戻すで順番ごと戻る、次の削除で前の分は戻せない、壊れた・無いファイルでも落ちない、起動時に trash を空にする）: `LibraryDeleteTests`
+- ライブラリの削除（まとめて削除 → 元に戻すで順番ごと戻る、次の削除で前の分は戻せない、壊れた・無いファイルでも落ちない、起動時に trash を空にする）: `LibraryDeleteTests`（M12: 「選んだものを削除」ボタンは選択 0 で無効・選ぶと `（n）` つき、右クリックの「削除を元に戻す」は `CanRestore` が偽のとき無効。ボタンの見た目は画面確認）
+- 看板の保存・復元（往復で合成が同じ、新しい版・壊れたファイル、ライブラリに無いスタンプ、`BoardDoc.Load`、減色の設定）: `BoardFileTests`（[boardfile.md](boardfile.md)）
 - スタンプの拡縮・回転・当たり判定（透明部分は拾わない）: `CompositorTests.StampsAreTransformed`, `StampTransparencyIsHonouredForPicking`
 - ハンドル位置・つまみの退避・移動/拡縮/回転/15° 吸着・倍率制限: `EditingTests`
 - undo/redo（オブジェクト・下地・選択）、z 順: `EditingTests.UndoRedoRestoresObjectsBackgroundAndSelection`, `RestackAndHitTestUseTheZOrder`
@@ -199,4 +228,5 @@ Ctrl+V・「貼り付け」ボタン（[ui.md](ui.md)）で、クリップボー
 
 ## 未テスト
 - 高 DPI での `EditorView`（1 倍表示は物理ピクセル前提。`AutoScaleMode.Dpi` で周りだけ拡大される想定）。
-- 編集中の状態の保存・復元（未実装: 終了すると看板の構成は消える。ライブラリと設定は残る）。
+- 編集中の看板の保存・復元は `.kanban` ファイル（[boardfile.md](boardfile.md)）。開いているファイルは終了すると覚えない（保存していない変更は、閉じるときの確認で保存できる）。
+- ライブラリの右クリックのメニュー・ToolTip の文言の見え方（画面確認）。
