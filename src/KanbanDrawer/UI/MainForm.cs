@@ -500,9 +500,14 @@ namespace KanbanDrawer.UI
                 Log(err);
                 return;
             }
+            ShowBoard(b);
+            Log($"看板を検出しました: キャンバス左上 ({b.Origin.X}, {b.Origin.Y}) / ウィンドウ「{b.WindowTitle}」");
+        }
+
+        void ShowBoard(BoardTarget b)
+        {
             boardState.Text = $"看板: ({b.Origin.X}, {b.Origin.Y})";
             host.Tips.SetToolTip(boardState, $"ウィンドウ「{b.WindowTitle}」");
-            Log($"看板を検出しました: キャンバス左上 ({b.Origin.X}, {b.Origin.Y}) / ウィンドウ「{b.WindowTitle}」");
         }
 
         async void StartDrawing(bool resumeFromBoard)
@@ -531,7 +536,8 @@ namespace KanbanDrawer.UI
                 var (t, fullPlan) = await host.EnsureDraftAsync();
                 var plan = resumeFromBoard ? null : fullPlan;
                 ShowOverlay();
-                var result = await Task.Run(() => DrawRunner.Run(t, plan, new DrawSettings(), mode, CountdownSeconds, LogAsync, progress, token));
+                var result = await Task.Run(() => DrawRunner.Run(t, plan, new DrawSettings(), mode, CountdownSeconds, LogAsync, progress, token,
+                    b => BeginInvoke((Action)(() => ShowBoard(b)))));
                 if (result.Completed) bar.Value = bar.Maximum;
                 if (result.InterruptReason == null)
                     Log(result.Completed ? "看板の「保存」はご自身で押してください。" : "一致しない画素が残っています。「続きから / 手直し」で再度描けます。");

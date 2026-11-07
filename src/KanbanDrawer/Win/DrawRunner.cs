@@ -13,7 +13,8 @@ namespace KanbanDrawer.Win
         /// <param name="plan">null = plan from the board as it is (resume / touch up)</param>
         /// <param name="log">status lines (any thread)</param>
         public static DrawResult Run(IndexedImage target, DrawPlan plan, DrawSettings settings, InputMode mode,
-            int countdownSeconds, Action<string> log, IProgress<DrawProgress> progress, CancellationToken cancel = default)
+            int countdownSeconds, Action<string> log, IProgress<DrawProgress> progress, CancellationToken cancel = default,
+            Action<BoardTarget> found = null)
         {
             settings = settings.Clone();
             var tracePath = Environment.GetEnvironmentVariable("KANBANDRAWER_TRACE");
@@ -30,6 +31,7 @@ namespace KanbanDrawer.Win
             var board = BoardFinder.Find(out string error);
             if (board == null) return Fail(error, log);
             log($"看板を検出: キャンバス左上 {board.Origin} / ウィンドウ「{board.WindowTitle}」");
+            found?.Invoke(board);
 
             // Post mode works in the background, but the board must stay visible for reading it back.
             if (!InputDriver.BringToFront(board.Window) && mode == InputMode.Send)
